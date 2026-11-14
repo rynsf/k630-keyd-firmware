@@ -146,6 +146,18 @@ used, flag `0x24.6` clear), it sends App/Menu (`0x65`) on release (`0x6383`). Co
   software (keymap entry `[type, mod, usage, 0]`, handled at `0x47B9`).
 - **No speed key.** Speed (`0x1E`) is only loaded from settings, set by reset, or set
   over USB report 10.
+- **Cross-check with the manual** (`docs/manual/k630-pink-manual.pdf`, "REDRAGON K630 Pink
+  Backlit"; `k630-dragonborn-manual.pdf` has the same content, "Dragonborn wired 61 key"):
+  - All 15 FN1 entries match exactly.
+  - FN1 + WIN lock matches.
+  - FN2 + 9 / 0 / - / + match.
+  - The macro lighting procedure matches the `0x0BFE` state machine. FN2 + Backspace goes ready → record → save.
+    FN1 + Backspace held clears the per-key lights and saves (the manual says 5 s; the code counts 120 ticks).
+  - The manual lists no media keys, which matches the firmware.
+  - Differences:
+    1. The manual says 18 modes; the code cycles 19 values (1, 3…20), with 2 = custom.
+    2. The manual says FN2 + ESC must be *held 3 s*, but `0x654A` resets on the press edge with
+       no timer, so **a quick FN2 + Esc already factory-resets and writes flash**.
 
 ## Firmware structure
 
