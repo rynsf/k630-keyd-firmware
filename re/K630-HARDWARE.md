@@ -159,6 +159,13 @@ used, flag `0x24.6` clear), it sends App/Menu (`0x65`) on release (`0x6383`). Co
     2. The manual says FN2 + ESC must be *held 3 s*, but `0x654A` resets on the press edge with
        no timer, so **a quick FN2 + Esc already factory-resets and writes flash**.
 
+- **Keycap legends** (`docs/images/k630-pink-product.jpg`, `k630-pink-top.webp`) agree:
+  - The bottom row reads Fn / "FN1" and ☰ / "FN2" (the Menu icon).
+  - The front prints on number keys 1…= read F1…F12, matching FN1.
+  - FN2 icons appear on 9 (mode), 0 (light on/off), − (dimmer) and = (brighter), with "MR" (macro record) on Backspace.
+  - Arrows appear on W/A/S/D, and PRTSC/HOME/END/PGUP/PGDN/INSERT/DELETE on P [ ] ; ' . /.
+  - No media icons are printed. The box claims "12 multimedia keys", but these exist only through Redragon's software remap (key type 2).
+
 ## Firmware structure
 
 | What | Address |
