@@ -136,10 +136,22 @@ index 15fbe8f..5170b84 100644
              'diag_info.c',
              'usbhw.c',
 diff --git a/src/smk/usb.c b/src/smk/usb.c
-index 4365630..97c421a 100644
+index 4365630..d8ac4a9 100644
 --- a/src/smk/usb.c
 +++ b/src/smk/usb.c
-@@ -379,6 +379,8 @@ static __bit            ep0_address_pending;
+@@ -358,6 +358,11 @@ uint8_t            interface0_protocol;
+ uint8_t            interface1_protocol;
+ // Host-controlled remote-wakeup enable, per SET/CLEAR_FEATURE.
+ static __bit usb_remote_wakeup;
++
++bool usb_remote_wakeup_enabled(void)
++{
++    return usb_remote_wakeup;
++}
+ __bit        usb_suspended;
+ #ifdef ISP_ENABLE
+ static __bit usb_isp_requested;
+@@ -379,6 +384,8 @@ static __bit            ep0_address_pending;
  #define ENUM_GIVE_UP_MS 4000
  
  static volatile uint16_t enum_quiet_ticks;
@@ -148,7 +160,7 @@ index 4365630..97c421a 100644
  static volatile bool     enum_seen;
  
  static void usb_reset_state(void)
-@@ -520,6 +522,7 @@ void usb_irq_dispatch(void)
+@@ -520,6 +527,7 @@ void usb_irq_dispatch(void)
              enum_quiet_ticks--;
          }
          usb_suspended = 0; // a SOF means the host is driving the bus again
@@ -157,15 +169,18 @@ index 4365630..97c421a 100644
  
      if (if1 & _RESMIF) {
 diff --git a/src/smk/usb.h b/src/smk/usb.h
-index b3db845..fe82a24 100644
+index b3db845..79b9aed 100644
 --- a/src/smk/usb.h
 +++ b/src/smk/usb.h
-@@ -25,6 +25,9 @@ void usb_wait_for_enumeration(void);
+@@ -25,6 +25,12 @@ void usb_wait_for_enumeration(void);
  // runs what the USB interrupt defers to the main loop: currently the jump into the ISP bootloader.
  void usb_task(void);
  
 +// Incremented by every USB start-of-frame (1 ms) while the host drives the bus.
 +extern volatile uint16_t usb_sof_ms;
++
++// True once the host has enabled remote wakeup (SET_FEATURE DEVICE_REMOTE_WAKEUP).
++bool usb_remote_wakeup_enabled(void);
 +
  // the part of the USB interrupt that does not vary by part; the vector calls it inside its own banking prologue.
  void usb_irq_dispatch(void);

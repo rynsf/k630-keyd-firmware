@@ -29,7 +29,7 @@ sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "tests"))
 
 import difftest  # noqa: E402  (script generators)
-from k630sim import K630Sim  # noqa: E402
+from k630sim import K630Sim, one_media_slot  # noqa: E402
 
 difftest.K630_KEYS = [k for k in difftest.K630_KEYS if k != "compose"]
 ORACLE = ROOT / "tools/bin/keyd-oracle"
@@ -67,7 +67,7 @@ def main():
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "s.keys"
             path.write_text(text)
-            want = oracle(config, path)
+            want = one_media_slot(oracle(config, path))
         sim = K630Sim()
         try:
             sim.boot_configured()

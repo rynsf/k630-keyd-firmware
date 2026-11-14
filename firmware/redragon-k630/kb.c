@@ -16,6 +16,7 @@
 #include "user_init.h"
 #include "kb.h"
 #include "hidmap.h"
+#include "backlight.h"
 #include "engine/kd.h"
 
 // ---------------------------------------------------------------------------------------
@@ -219,6 +220,8 @@ void kd_output(uint8_t code, uint8_t pressed)
     out_head                = next;
 }
 
+static uint16_t consumer_now; // media usage currently in the consumer report
+
 static void send_output(uint8_t code, uint8_t pressed)
 {
     const uint8_t hid = keyd_to_hid[code];
@@ -242,9 +245,18 @@ static void send_output(uint8_t code, uint8_t pressed)
         send_keyboard_report();
         return;
     }
+    // Media keys: the consumer report holds one usage (as in the stock descriptor). A new
+    // press replaces it; a release clears it only if it is the one being reported, so
+    // releasing a key never cuts off another one that is still held.
     for (uint8_t i = 0; i < HIDMAP_CONSUMER; i++) {
         if (hidmap_consumer[i].code == code) {
-            host_consumer_send(pressed ? hidmap_consumer[i].usage : 0);
+            if (pressed) {
+                consumer_now = hidmap_consumer[i].usage;
+                host_consumer_send(consumer_now);
+            } else if (consumer_now == hidmap_consumer[i].usage) {
+                consumer_now = 0;
+                host_consumer_send(0);
+            }
             return;
         }
     }
@@ -298,14 +310,40 @@ static uint8_t key_down_as(uint8_t hid)
         return fn1_translate(hid);
     }
     if (fn2) {
-        fn2_combo = true; // lighting combos: not implemented yet (Phase 4)
+        fn2_combo = true; // FN2 combos send nothing; three of them drive the backlight
+        if (hid == KC_0) {
+            backlight_toggle();
+        } else if (hid == KC_EQL) {
+            backlight_brighter();
+        } else if (hid == KC_MINS) {
+            backlight_dimmer();
+        }
         return 0;
     }
     return hid;
 }
 
+// Remote wakeup: while the host has the bus suspended, a key press asks the USB block to
+// signal resume (if the host enabled remote wakeup), exactly as the stock firmware does
+// (clear GOSUSP, set WKUP once; the hardware times the resume signal). The press itself,
+// and its release, are dropped, as any keyboard does with the key that woke the host.
+static bool wake_requested;
+
 bool kb_process_record(uint16_t keycode, bool key_pressed)
 {
+    if (usb_suspended) {
+        if (key_pressed) {
+            wake_requested = true;
+        }
+        if (keycode < sizeof(pressed_as)) {
+            pressed_as[keycode] = 0;
+        }
+        if (keycode != K630_FN1 && keycode != K630_FN2) {
+            return false;
+        }
+        fn2_combo = true; // Fn state stays tracked, but no Menu tap from a waking press
+    }
+
     if (keycode == K630_FN1) {
         fn1 = key_pressed;
         return false;
@@ -356,6 +394,14 @@ void kb_init(void)
 
 void kb_update(void)
 {
+    if (wake_requested) {
+        wake_requested = false;
+        if (usb_suspended && usb_remote_wakeup_enabled()) {
+            USBCON &= (uint8_t)~_GOSUSP;
+            USBCON |= _WKUP;
+        }
+    }
+
     if (k630_boot_loops < HEALTHY_LOOPS) {
         if (++k630_boot_loops == HEALTHY_LOOPS) {
             marker_write(false); // this start is healthy: a later watchdog reset just reboots

@@ -11,6 +11,7 @@ keyboards += {
             'user_init.c',
             'user_sleep.c',
             'kb.c',
+            'backlight.c',
             'hidmap.c',
             'engine/kd.c',
             'kd_config_gen.c',  # generated from keymap/rynsf.conf by `make firmware`

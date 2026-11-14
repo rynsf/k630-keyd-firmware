@@ -212,6 +212,119 @@ class TestFnLayers(K630Case):
         self.assertEqual(unlocked, oracle(tap), "Win-lock off again: Win goes through keyd")
 
 
+# --- backlight and Caps Lock ------------------------------------------------------------
+PWM24DUTY2 = None  # column 0 (Caps Lock's column) duty register, resolved from the header
+
+
+def col0_duty_xram():
+    h = (ROOT / "third_party/smk/src/sino51lib/sh68f90/sh68f90.h").read_text()
+    lo = int(re.search(r"SFRX\(PWM24DUTY2L,\s*(0x[0-9a-fA-F]+)\)", h).group(1), 16)
+    hi = int(re.search(r"SFRX\(PWM24DUTY2H,\s*(0x[0-9a-fA-F]+)\)", h).group(1), 16)
+    return lo, hi
+
+
+LED_DUTY = lambda v: 0x400 - (v << 2)
+FULL = 255
+
+
+class TestBacklight(K630Case):
+    def setUp(self):
+        super().setUp()
+        self.s.boot_configured()
+        self.on, self.level = self.s._a("k630_backlight_on"), self.s._a("k630_backlight_level")
+
+    def state(self):
+        return self.s.get_xram(self.on, 1)[0], self.s.get_xram(self.level, 1)[0]
+
+    def test_defaults_on_at_full_brightness(self):
+        self.assertEqual(self.state(), (1, 5))
+
+    def test_fn2_combos(self):
+        s = self.s
+        s.play("FN2 down\n0 down\n0 up\nFN2 up\n")
+        self.assertEqual(self.state(), (0, 5), "FN2 + 0 turns it off")
+        s.play("FN2 down\n0 down\n0 up\nFN2 up\n")
+        self.assertEqual(self.state(), (1, 5), "and on again")
+        s.play("FN2 down\n" + "- down\n- up\n" * 7 + "FN2 up\n")
+        self.assertEqual(self.state(), (1, 1), "FN2 + - dims, stops at the lowest level")
+        s.play("FN2 down\n= down\n= up\n= down\n= up\nFN2 up\n")
+        self.assertEqual(self.state(), (1, 3), "FN2 + = brightens")
+        self.assertEqual(s.decode(), [], "backlight combos send nothing to the host")
+
+    def caps_column_duties(self, caps, on):
+        """Run LED subframes; return the Caps Lock column's duty on the Caps row and on
+        another row (the subframe leaves the active row's P6 bit low)."""
+        s = self.s
+        s.cmd("set mem xram 0x%x 0x%02x" % (self.on, 1 if on else 0))
+        ks = s._a("keyboard_state")
+        s.cmd("set mem xram 0x%x 0x%02x" % (ks, 0x02 if caps else 0x00))
+        lo, hi = col0_duty_xram()
+        post = s._a("indicators_post_update")
+        s.scan_isr(True)
+        s.brk(post)
+        seen = {}
+        for _ in range(40):
+            s.run()
+            p6 = s.get_sfr(0xC0)
+            rows = [r for r in range(5) if not p6 & (1 << (r + 1))]
+            if rows:
+                l, h = s.get_xram(lo, 1)[0], s.get_xram(hi, 1)[0]
+                seen[rows[0]] = l | h << 8
+            if 2 in seen and any(r != 2 for r in seen):
+                break
+        s.cmd("delete")
+        s.scan_isr(False)
+        other = next((seen[r] for r in seen if r != 2), None)
+        return seen.get(2), other
+
+    def test_caps_lock_lights_only_its_key_when_backlight_off(self):
+        caps_row, other = self.caps_column_duties(caps=True, on=False)
+        self.assertEqual(caps_row, LED_DUTY(FULL), "Caps Lock key lit")
+        self.assertEqual(other, LED_DUTY(0), "every other key dark")
+
+    def test_caps_lock_darkens_only_its_key_when_backlight_on(self):
+        caps_row, other = self.caps_column_duties(caps=True, on=True)
+        self.assertEqual(caps_row, LED_DUTY(0), "Caps Lock key dark")
+        self.assertEqual(other, LED_DUTY(FULL), "every other key lit")
+
+    def test_no_caps_backlight_on_lights_everything(self):
+        caps_row, other = self.caps_column_duties(caps=False, on=True)
+        self.assertEqual((caps_row, other), (LED_DUTY(FULL), LED_DUTY(FULL)))
+
+    def test_side_caps_led_pin_is_never_driven(self):
+        self.assertFalse(self.s.get_sfr(0xE1) & 0x08, "P0.3 must stay an input (P0CR bit 3 clear)")
+
+
+# --- remote wakeup ------------------------------------------------------------------------
+class TestRemoteWakeup(K630Case):
+    def setUp(self):
+        super().setUp()
+        self.s.boot_configured()
+
+    def usbcon_wkup_after_keypress(self, host_enabled):
+        s = self.s
+        s.set_sfr(0x91, s.get_sfr(0x91) & ~0x02)
+        s.set_bit("usb_remote_wakeup", host_enabled)
+        s.set_bit("usb_suspended", True)
+        s.key("a", True)
+        s.loop(1)                           # loop() stops at kb_update's entry: run it once more
+        wk = bool(s.get_sfr(0x91) & 0x02)
+        s.set_bit("usb_suspended", False)   # the host resumes
+        s.key("a", False)
+        return wk
+
+    def test_keypress_while_suspended_signals_resume(self):
+        self.assertTrue(self.usbcon_wkup_after_keypress(True), "USBCON.WKUP set")
+        self.assertEqual(self.s.decode(), [], "the waking key is not typed, and nothing sticks")
+
+    def test_no_resume_if_host_did_not_enable_it(self):
+        self.assertFalse(self.usbcon_wkup_after_keypress(False))
+
+    def test_keys_work_normally_after_resume(self):
+        self.usbcon_wkup_after_keypress(True)
+        self.assertEqual([tuple(e) for e in self.s.play("a down\na up\n")], oracle("a down\na up\n"))
+
+
 # --- resources ----------------------------------------------------------------------------
 class TestResources(K630Case):
     def test_stack_on_a_heavy_engine_path(self):

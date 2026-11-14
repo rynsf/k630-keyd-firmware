@@ -62,6 +62,26 @@ def _hid_tables():
 
 
 HID_TO_CODE, CONSUMER_TO_CODE = _hid_tables()
+MEDIA = {KEYD_NAME[c] for c in CONSUMER_TO_CODE.values()}
+
+
+def one_media_slot(events):
+    """keyd's events as a host sees them through the one-usage consumer report: a new
+    media press replaces the held one (old up, new down); releasing a media key that was
+    already replaced shows nothing."""
+    out, cur = [], None
+    for name, state in events:
+        if name not in MEDIA:
+            out.append((name, state))
+        elif state == "down":
+            if cur and cur != name:
+                out.append((cur, "up"))
+            out.append((name, "down"))
+            cur = name
+        elif name == cur:
+            out.append((name, "up"))
+            cur = None
+    return out
 
 
 class K630Matrix:
@@ -117,6 +137,23 @@ class K630Sim(Air60Sim):
             pass
         if self._serr_thread.is_alive():
             self._serr_thread.join(timeout=1)
+
+    # --- bit variables (resolved from the linker listing) -------------------------------
+    def bit_addr(self, name):
+        """Absolute bit address of a __bit variable, from an instruction that uses it."""
+        rst = Path(self.firmware).with_suffix(".ihx.p") / "usb.rst"
+        for line in rst.read_text().splitlines():
+            m = re.match(r"\s+[0-9A-F]{6}\s+(D2|A2|92)\s+([0-9A-F]{2})\s.*\b_%s\b" % name, line)
+            if m:
+                return int(m.group(2), 16)
+        raise KeyError(name)
+
+    def set_bit(self, name, value):
+        a = self.bit_addr(name)
+        byte, bit = 0x20 + (a >> 3), a & 7
+        v = self.get_iram(byte, 1)[0]
+        v = (v | (1 << bit)) if value else (v & ~(1 << bit))
+        self.cmd("set mem iram 0x%x 0x%02x" % (byte, v))
 
     # --- boot / clock ------------------------------------------------------------------
     def boot_configured(self):
@@ -217,12 +254,13 @@ class K630Sim(Air60Sim):
             elif b and b[0] == 6:                        # NKRO: id, mods, bitmap
                 keys = {i * 8 + j for i, v in enumerate(b[2:]) for j in range(8) if v >> j & 1}
                 self._diff(b[1], keys)
-            elif b and b[0] == 2:                        # consumer: id, usage16
+            elif b and b[0] == 2:                        # consumer: id, usage16 (one slot)
                 usage = b[1] | b[2] << 8
-                if usage:
-                    self.events.append((KEYD_NAME[CONSUMER_TO_CODE[usage]], "down"))
-                elif self._consumer:
-                    self.events.append((KEYD_NAME[CONSUMER_TO_CODE[self._consumer]], "up"))
+                if usage != self._consumer:              # what the host sees: old up, new down
+                    if self._consumer:
+                        self.events.append((KEYD_NAME[CONSUMER_TO_CODE[self._consumer]], "up"))
+                    if usage:
+                        self.events.append((KEYD_NAME[CONSUMER_TO_CODE[usage]], "down"))
                 self._consumer = usage
         self._seen = len(lines)
         return self.events
