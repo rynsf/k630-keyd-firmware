@@ -34,9 +34,10 @@ read with pull-ups.
 - Raw test with keyd stopped (`keyd monitor`, 2026-11-14), pressing left to right: leftcontrol,
   leftmeta, leftalt, space, rightalt, *(Fn: nothing)*, compose (App 0x65), rightcontrol. This
   matches the modifier bitmasks in the stock tables.
-- **Still open:** whether Fn is c9 and Menu is c10, or the reverse. Both carry the vendor code
-  `0xB0` in the stock table. We assume Fn = c9 and Menu = c10 (as on the Z11) and verify after
-  the first flash. A wrong guess only swaps those two keys.
+- **Settled (disassembly):** FN1 = c9 and FN2 = c10. Both carry `0xB0` in the default
+  table. `0x4A84` sets the FN1 flag (`0x24.3`) from matrix byte `0x69` bit 5 (c9, bottom
+  row). `0x6368` sets the FN2 flag (`0x25.1`) from `0x6A` bit 5 (c10). The key legended
+  "Menu" is FN2: see "Fn layers" below.
 - P7.0 is configured as an input but never read. In the generic table it is the F-key row,
   which a 60 % board does not have.
 - Unused on the K630 but scanned by the stock firmware: columns 14–20 = P1.3, P1.2, P1.1, P1.0,
@@ -108,14 +109,43 @@ The stock firmware **writes its own flash at runtime** (settings and remaps):
 - **Modifier positions** (byte 1 of each flash entry, as a bitmask):
   - LCtrl c0r4 (`0x01`), LShift c0r3 (`0x02`), LAlt c2r4 (`0x04`), LWin c1r4 (`0x08`)
   - RCtrl c12r4 (`0x10`), RShift c12r3 (`0x20`), RAlt c8r4 (`0x40`)
-- **`0xB0` = Fn marker.** It is never sent to the host and is stripped from reports at
-  `0x07DA` and `0x6131`. Under some condition `0x6388` puts App (`0x65`) in a report slot,
-  inferred to be the Menu key.
-- **Stock Fn layer** (`0x07xx`–`0x09xx`). It uses a row-major index (`row*21 + col`):
-  - Fn + Esc = `` ` ``, Fn + 1…= = F1…F12
-  - Fn + W/A/S/D = Up/Left/Down/Right
-  - Fn + P = PrtSc, Fn + [ = Home, Fn + ] = End, Fn + ; = PgUp, Fn + ' = PgDn
-  - Fn + . = Ins, Fn + / = Del
+- **`0xB0` = Fn marker** (both FN1 and FN2). It is never sent to the host and is stripped
+  from reports at `0x07DA` and `0x6131`.
+## Fn layers (from the disassembly, 2026-11-14)
+
+Matrix state is IRAM `0x60+col`, bit = row, where row 1 is the number row and row 5 the bottom row.
+Every combo below is edge-triggered: it acts once per press.
+
+**FN1** (key legended Fn, c9, flag `0x24.3`). Keys are translated, and the result goes to the host as normal keys:
+
+| Combo | Result | Code |
+|---|---|---|
+| FN1 + Esc | `` ` `` | Fn chain `0x080B`… (row-major `row*21+col`) |
+| FN1 + 1 … 0, -, = | F1 … F12 | " |
+| FN1 + W / A / S / D | Up / Left / Down / Right | " |
+| FN1 + P, [, ], ;, ' | PrtSc, Home, End, PgUp, PgDn | " |
+| FN1 + . , / | Ins, Del | " |
+| FN1 + LWin | toggle **Win-lock** (flag `0x25.5`; while set, `0x0944` masks out the Win bits with `ANL 0x77`). Not saved to flash; cleared by reset. | `0x6588` |
+| FN1 + Backspace held ~120 ticks | enter custom-light edit mode (`0x0BFE`=1) | `0x50B7` |
+
+**FN2** (key legended Menu, c10, flag `0x25.1`). While it is held, every ordinary key's code is
+zeroed (`0x07DA`), so FN2 + anything else sends nothing. **Tapped alone** (no FN2 combo
+used, flag `0x24.6` clear), it sends App/Menu (`0x65`) on release (`0x6383`). Combos:
+
+| Combo | Result | Code |
+|---|---|---|
+| FN2 + 9 | next lighting mode (`0x0C0B`: 1, 3, 4 … 20, then wraps to 1; mode 2 = custom) → saved to flash | `0x5FCF` |
+| FN2 + 0 | backlight on/off (`CPL 0x20.7`); saved to flash when it turns on | `0x5FCF` |
+| FN2 + = | brightness up (`0x1F`, max 5) | `0x59BA` |
+| FN2 + - | brightness down (min 1) | `0x59BA` |
+| FN2 + Backspace | custom-light mode: select it, or in edit mode save (writes flash `0xCA00`) | `0x5064` |
+| FN2 + Esc | **factory reset**: mode 1, brightness 5, speed 2, Win-lock off, default keymap; **writes flash** (`0xC600` keymap, settings) | `0x654A` → `0x619D` |
+
+- **No media keys in the stock layers.** No FN1/FN2 path writes a consumer usage. The
+  consumer report (ID 2) is only used for keys remapped as type 2 with Redragon's
+  software (keymap entry `[type, mod, usage, 0]`, handled at `0x47B9`).
+- **No speed key.** Speed (`0x1E`) is only loaded from settings, set by reset, or set
+  over USB report 10.
 
 ## Firmware structure
 
