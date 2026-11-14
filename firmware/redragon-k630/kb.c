@@ -11,6 +11,8 @@
 #include "host.h"
 #include "usb.h"
 #include "isp.h"
+#include "ldo.h"
+#include "clock.h"
 #include "user_init.h"
 #include "kb.h"
 #include "hidmap.h"
@@ -47,9 +49,16 @@ static void marker_write(bool booting)
     }
 }
 
+// The bootloader's ISP entry (0xFF00) expects the chip already running: its own cold-start
+// ISP path enables the LDO and starts the PLL first, but the entry the firmware jumps to
+// does not, and USB cannot work without the PLL. (Found on the real keyboard: jumping from
+// early boot left the chip in ISP mode with no USB at all.) So the early-boot exits bring
+// the clocks up exactly as init() would, then jump.
 static void enter_isp(void)
 {
     marker_write(false); // the start after ISP mode boots normally
+    ldo_init();
+    clock_init(); // a PLL that never locks jumps to ISP itself (bounded wait)
     isp_jump();
 }
 

@@ -41,6 +41,15 @@ def regs(sess):
     return (int(acc.group(1), 16) if acc else None, int(b.group(1), 16) if b else None)
 
 
+def clocks_up(sess):
+    """At the ISP jump the chip must already run as the bootloader's ISP code expects:
+    LDO on (REGCON.REGEN), PLL on and selected (PLLCON PLLON|PLLFS), CPU on the fast clock
+    (CLKCON HFON|FS). Without the PLL the bootloader's USB never comes up (seen on the real
+    keyboard). The simulator does not model that dependency, so it is asserted here."""
+    regcon, pllcon, clkcon = sess.get_sfr(0x8F), sess.get_sfr(0xBC), sess.get_sfr(0xB2)
+    return (regcon & 0x01, pllcon & 0x03, clkcon & 0x0C) == (0x01, 0x03, 0x0C)
+
+
 class K630Case(unittest.TestCase):
     def setUp(self):
         self.s = K630Sim()
@@ -88,6 +97,7 @@ class TestBootMarker(K630Case):
         at = self.boot_until(ISP, s._a("kb_update"))
         self.assertEqual(at, ISP)
         self.assertEqual(regs(s), (0x5A, 0xA5))
+        self.assertTrue(clocks_up(s), "LDO + PLL must be running for the bootloader's USB")
         self.assertEqual(s.get_xram(MARKER, 4), [0, 0, 0, 0], "cleared, so the next start is normal")
 
     def test_hang_during_boot_ends_in_isp_via_watchdog(self):
@@ -105,6 +115,7 @@ class TestBootMarker(K630Case):
         self.assertIn("WATCHDOG timeout", s.stderr_text())
         self.assertEqual(s.stopped_at(out), ISP)
         self.assertEqual(regs(s), (0x5A, 0xA5))
+        self.assertTrue(clocks_up(s), "LDO + PLL must be running for the bootloader's USB")
 
 
 class TestBootEscape(K630Case):
@@ -113,6 +124,7 @@ class TestBootEscape(K630Case):
         s.set_pin(P5, 0xFF & ~(1 << 4))                  # FN1 pulls row 4 (P5.4) low
         self.assertEqual(self.boot_until(ISP, s._a("kb_update")), ISP)
         self.assertEqual(regs(s), (0x5A, 0xA5))
+        self.assertTrue(clocks_up(s), "LDO + PLL must be running for the bootloader's USB")
 
     def test_no_key_held_boots_normally(self):
         s = self.s
