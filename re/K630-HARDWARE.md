@@ -31,6 +31,9 @@ read with pull-ups.
 
 - The legends on the bottom row (from the keycaps) are Ctrl, Win, Alt, Space, Alt, Fn,
   Menu (with an arrow), Ctrl: 8 keys, so 61 in total.
+- Raw test with keyd stopped (`keyd monitor`, 2026-11-14), pressing left to right: leftcontrol,
+  leftmeta, leftalt, space, rightalt, *(Fn: nothing)*, compose (App 0x65), rightcontrol. This
+  matches the modifier bitmasks in the stock tables.
 - **Still open:** whether Fn is c9 and Menu is c10, or the reverse. Both carry the vendor code
   `0xB0` in the stock table. We assume Fn = c9 and Menu = c10 (as on the Z11) and verify after
   the first flash. A wrong guess only swaps those two keys.
