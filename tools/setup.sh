@@ -12,6 +12,7 @@ mkdir -p "$TP" "$ROOT/tools/bin"
 SINOWISP_REV=242f7921357bad6df649efdd70c49dd059567ac7
 SMK_REV=dbd5c54e7607dfd584da3d4690b6d113925c976a
 SINODUDE_REV=2419ec17097e73478b8414816fef65e60dba5fae
+KEYD_REV=7c0aecb8bfd34dc8642bf4eefd2e59c89e61cec3  # v2.6.0
 SDCC_VER=4.5.0
 SDCC_SHA256=d5030437fb436bb1d93a8dbdbfb46baaa60613318f4fb3f5871d72815d1eed80
 
@@ -24,6 +25,7 @@ clone() { # name url rev
 clone sinowisp https://github.com/karstx/sinowisp "$SINOWISP_REV"
 clone smk      https://github.com/karstx/smk      "$SMK_REV"
 clone sinodude https://github.com/karstx/sinodude "$SINODUDE_REV"
+clone keyd     https://github.com/rvaiya/keyd     "$KEYD_REV"
 
 # sinowisp (ISP flasher)
 (cd "$TP/sinowisp" && cargo build --release)
@@ -60,5 +62,8 @@ make -j"$(nproc)" >/dev/null && make install >/dev/null
 for t in sdcc sdar packihx sdas8051 sdld sdcpp; do
     ln -sf "$ROOT/tools/sdcc-$SDCC_VER/bin/$t" "$ROOT/tools/bin/$t"
 done
+
+# keyd oracle, config export, engine host build
+(cd "$ROOT" && make tools)
 
 echo "done. run: source tools/env.sh"
