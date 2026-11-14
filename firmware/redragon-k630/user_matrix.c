@@ -113,3 +113,15 @@ uint8_t user_matrix_read_rows(void)
 {
     return (uint8_t)(((P7 >> 1) & 0x07) | (P5 & 0x18) | 0xE0);
 }
+
+// The backlight hands the column pins to the PWM block during each LED phase (inputs,
+// no pull-up). Take them back as outputs, deselected (high), before every matrix scan.
+void user_matrix_scan_pre(void)
+{
+    GPIO_HIGH(1, KB_C_P1_MASK);
+    GPIO_HIGH(2, KB_C_P2_MASK);
+    GPIO_HIGH(3, KB_C_P3_MASK);
+    GPIO_OUTPUT(1, KB_C_P1_MASK);
+    GPIO_OUTPUT(2, KB_C_P2_MASK);
+    GPIO_OUTPUT(3, KB_C_P3_MASK);
+}

@@ -223,8 +223,8 @@ def col0_duty_xram():
     return lo, hi
 
 
-LED_DUTY = lambda v: 0x400 - (v << 2)
-FULL = 255
+LED_DUTY = lambda level: 700 * level  # stock scale: duty2 = level * 50 * 14, 0 = dark
+FULL = 5
 
 
 class TestBacklight(K630Case):
@@ -290,6 +290,27 @@ class TestBacklight(K630Case):
     def test_no_caps_backlight_on_lights_everything(self):
         caps_row, other = self.caps_column_duties(caps=False, on=True)
         self.assertEqual((caps_row, other), (LED_DUTY(FULL), LED_DUTY(FULL)))
+
+    def test_column_pins_return_to_the_matrix_scan(self):
+        """The LED phase makes the column pins PWM inputs; every scan must get them back as
+        outputs, or keys stop working. A pin-level key press after LED phases proves it."""
+        s = self.s
+        s.scan_isr(True)
+        s.loop(30)                                   # many LED subframes
+        s.scan_isr(False)
+        self.assertEqual([tuple(e) for e in s.play("a down\n20ms\na up\n", direct=False)],
+                         oracle("a down\n20ms\na up\n"))
+
+    def test_every_column_channel_is_pwm_enabled(self):
+        """All 14 column channels under PWM (stock 0x8A), not just the first of each bank."""
+        s = self.s
+        s.scan_isr(True)
+        s.loop(10)                                   # main loop: PWM re-enabled after each tick
+        s.scan_isr(False)
+        h = (ROOT / "third_party/smk/src/sino51lib/sh68f90/sh68f90.h").read_text()
+        for ch in "00 01 02 03 04 05 10 11 12 13 14 15 24 25".split():
+            a = int(re.search(r"SFRX\(PWM%sCON,\s*(0x[0-9a-fA-F]+)\)" % ch, h).group(1), 16)
+            self.assertEqual(s.get_xram(a, 1)[0] & 0x8A, 0x8A, "PWM%sCON" % ch)
 
     def test_side_caps_led_pin_is_never_driven(self):
         self.assertFalse(self.s.get_sfr(0xE1) & 0x08, "P0.3 must stay an input (P0CR bit 3 clear)")

@@ -3,7 +3,7 @@
 #include "gpio.h"
 #include "pwm.h"
 
-#define PWM_PERD        0x0400 // LED PWM period, as on the Z11
+#define PWM_PERD        0x0DFC // LED PWM period, as the stock firmware
 #define PWM_PERDH_INIT  ((uint8_t)(PWM_PERD >> 8))
 #define PWM_PERDL_INIT  ((uint8_t)(PWM_PERD))
 
@@ -48,7 +48,7 @@ void user_gpio_init(void)
     GPIO_HIGH(7, (uint8_t)(_P7_5));
 }
 
-static void user_pwm_init(void) // as on the Z11: LED column PWMs, all dark to start
+static void user_pwm_init(void) // as the stock firmware (0x1792...): duty1 = duty2 = 0, dark
 {
     PWM0PERDH = PWM_PERDH_INIT;
     PWM0PERDL = PWM_PERDL_INIT;
@@ -57,20 +57,20 @@ static void user_pwm_init(void) // as on the Z11: LED column PWMs, all dark to s
     PWM2PERDH = PWM_PERDH_INIT;
     PWM2PERDL = PWM_PERDL_INIT;
 
-    SET_PWM_DUTY(LED_PWM_C0, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C1, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C2, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C3, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C4, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C5, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C6, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C7, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C8, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C9, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C10, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C11, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C12, PWM_PERD, 0);
-    SET_PWM_DUTY(LED_PWM_C13, PWM_PERD, 0);
+    SET_PWM_DUTY(LED_PWM_C0, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C1, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C2, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C3, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C4, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C5, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C6, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C7, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C8, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C9, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C10, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C11, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C12, 0, 0);
+    SET_PWM_DUTY(LED_PWM_C13, 0, 0);
 }
 
 void user_init()
