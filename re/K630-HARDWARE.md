@@ -126,7 +126,7 @@ Every combo below is edge-triggered: it acts once per press.
 | FN1 + P, [, ], ;, ' | PrtSc, Home, End, PgUp, PgDn | " |
 | FN1 + . , / | Ins, Del | " |
 | FN1 + LWin | toggle **Win-lock** (flag `0x25.5`; while set, `0x0944` masks out the Win bits with `ANL 0x77`). Not saved to flash; cleared by reset. | `0x6588` |
-| FN1 + Backspace held ~120 ticks | enter custom-light edit mode (`0x0BFE`=1) | `0x50B7` |
+| FN1 + Backspace held ~120 ticks (manual: 5 s) | clear all per-key lights, save to flash `0xCA00`, then ready to record (`0x0BFE`=1) | `0x50B7` |
 
 **FN2** (key legended Menu, c10, flag `0x25.1`). While it is held, every ordinary key's code is
 zeroed (`0x07DA`), so FN2 + anything else sends nothing. **Tapped alone** (no FN2 combo
