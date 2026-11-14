@@ -9,7 +9,7 @@
 //
 // Caps Lock is shown on the Caps Lock key itself, as the inverse of the backlight: with
 // the backlight off it is the only lit key, with the backlight on it is the only dark one.
-// The separate Caps LED (P0.3) is never driven.
+// The side Caps LED (P0.3, active low) is held off by user_init.c.
 //
 // Nothing is saved (no flash writes): every power-up starts on, at full brightness. While
 // the host has the USB bus suspended, everything is dark.

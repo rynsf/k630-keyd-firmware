@@ -315,8 +315,14 @@ class TestBacklight(K630Case):
             v = s.get_xram(a, 1)[0] if m.group(1) else s.get_sfr(a)
             self.assertEqual(v & 0x8A, 0x8A, "PWM%sCON" % ch)
 
-    def test_side_caps_led_pin_is_never_driven(self):
-        self.assertFalse(self.s.get_sfr(0xE1) & 0x08, "P0.3 must stay an input (P0CR bit 3 clear)")
+    def test_side_caps_led_held_off(self):
+        """P0.3 is the side Caps LED, active low (stock 0x55AF). Held high = off, even with
+        Caps Lock on. (Floating, it glowed on the real keyboard.)"""
+        s = self.s
+        s.cmd("set mem xram 0x%x 0x02" % s._a("keyboard_state"))   # Caps Lock on
+        s.scan_isr(True); s.loop(20); s.scan_isr(False)
+        self.assertTrue(s.get_sfr(0xE1) & 0x08, "P0.3 is an output (P0CR bit 3)")
+        self.assertTrue(s.get_sfr(0x80) & 0x08, "P0.3 is high: LED off")
 
 
 # --- remote wakeup ------------------------------------------------------------------------
