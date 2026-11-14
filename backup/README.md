@@ -8,7 +8,7 @@ Read on 2026-11-14 with sinowisp 2.1.0 (`-d redragon-k630-norgb`) over the stock
 | Firmware version (bcdDevice) | 12.10 |
 | MCU | SinoWealth SH68F90 / SH68F90A (64 KiB flash, 4 KiB XRAM) |
 | Bootloader | top 4 KiB (`0xf000`–`0xffff`), MD5 `3e0ebd0c440af5236d7ff8872343f85d` (known, supported by sinowisp) |
-| Firmware used | ends at `0xc804` |
+| Firmware used | code `0x0000`–`0x66EB`; saved keymap + settings `0xC600`–`0xC80F` (see `re/K630-HARDWARE.md`) |
 
 ## Files
 
