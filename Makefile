@@ -27,7 +27,7 @@ FW_NAME  := redragon-k630_default_smk.hex
 FW_GEN   := firmware/redragon-k630/kd_config_gen.c
 TOOLPATH := PATH=$(CURDIR)/tools/bin:$$PATH
 
-.PHONY: all tools test test-config firmware test-firmware clean
+.PHONY: all tools test test-config firmware test-firmware canary clean FORCE
 all: tools $(OUT)/kd-host
 
 tools: $(TOOLS)
@@ -54,9 +54,12 @@ test:
 
 # Firmware image (never flashes anything). The board dir is linked into smk's tree and
 # smk's core changes come from firmware/smk.patch (see tools/setup.sh).
-$(FW_GEN): tools/bin/keyd-export $(CONFIG)
+# regenerated on every build (CONFIG may differ from last time); replaced only on change
+$(FW_GEN): tools/bin/keyd-export FORCE
 	tools/bin/keyd-export $(CONFIG) > $@.tmp 2>$(FW_GEN).log || (cat $(FW_GEN).log; rm -f $@.tmp; false)
-	mv $@.tmp $@
+	if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
+
+FORCE:
 
 firmware: $(FW_GEN)
 	@[ -d $(FW_BUILD) ] || $(TOOLPATH) meson setup $(FW_BUILD) $(SMK) --buildtype=release -Dboot=disabled
@@ -68,6 +71,17 @@ SIM_RANDOM ?= 300
 test-firmware: firmware
 	cd tests/firmware && $(TOOLPATH) python3 -m unittest -v test_k630
 	$(TOOLPATH) python3 tests/firmware/sim_difftest.py --config $(CONFIG) --random $(SIM_RANDOM) --seed $(SEED) --pins 10
+
+# The canary for the first flash: the same image with the pass-through config, kept as its
+# own file (build/canary/). Tests run against it, then the normal image is rebuilt.
+canary:
+	$(MAKE) --no-print-directory firmware CONFIG=tests/configs/passthrough.conf
+	mkdir -p build/canary
+	rm -rf build/canary/* && cp -r $(FW_BUILD)/redragon-k630_default_smk.* $(FW_BUILD)/user.lib.p build/canary/
+	cd tests/firmware && K630_FIRMWARE=$(CURDIR)/build/canary/$(FW_NAME) K630_CONFIG=tests/configs/passthrough.conf $(TOOLPATH) python3 -m unittest test_k630
+	K630_FIRMWARE=$(CURDIR)/build/canary/$(FW_NAME) $(TOOLPATH) python3 tests/firmware/sim_difftest.py --config tests/configs/passthrough.conf --random 100 --seed 4 --pins 5
+	$(MAKE) --no-print-directory firmware
+	@sha256sum build/canary/$(FW_NAME)
 
 clean:
 	rm -rf build $(TOOLS)

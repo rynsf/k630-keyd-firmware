@@ -6,6 +6,7 @@ in smk's patched uCsim. Static checks (no flash writes, memory map) run on the s
 
     python3 -m unittest discover -s tests/firmware -v
 """
+import os
 import re
 import subprocess
 import sys
@@ -28,7 +29,7 @@ def oracle(script):
     with tempfile.NamedTemporaryFile("w", suffix=".keys") as f:
         f.write(script)
         f.flush()
-        p = subprocess.run([str(ROOT / "tools/bin/keyd-oracle"), str(ROOT / "keymap/rynsf.conf"), f.name],
+        p = subprocess.run([str(ROOT / "tools/bin/keyd-oracle"), str(ROOT / os.environ.get("K630_CONFIG", "keymap/rynsf.conf")), f.name],
                            capture_output=True, text=True, check=True)
     return [tuple(l.split()[1:3]) for l in p.stdout.splitlines() if l.strip()]
 
@@ -225,7 +226,8 @@ def stack_bound():
     subprocess.run([str(HERE / "sdcclib.sh")], check=True, capture_output=True)
     p = subprocess.run([sys.executable, str(HERE / "stack_bound.py"), "222",
                         str(Path(FIRMWARE).with_suffix(".ihx.p")), str(build / "user.lib.p"),
-                        str(build / "sdcclib.asm.p")], capture_output=True, text=True)
+                        str(ROOT / "build/smk/sdcclib.asm.p")],  # written by sdcclib.sh
+                       capture_output=True, text=True)
     m = re.search(r"worst case main \+ deepest ISR: (\d+) of (\d+)", p.stdout)
     assert m, p.stdout + p.stderr
     main = int(re.search(r"main loop worst case: (\d+)", p.stdout).group(1))
