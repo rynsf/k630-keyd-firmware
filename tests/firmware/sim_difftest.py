@@ -10,7 +10,7 @@ key events. The two event sequences must be identical.
 Menu (FN2) is left out of the generated scripts: it is not a keyd key on the K630 (tap
 = Menu, hold = FN2 layer) and has its own test (test_k630.py).
 
-usage: sim_difftest.py [--config keymap/rynsf.conf] [--random 200] [--seed 1] [--pins N]
+usage: sim_difftest.py [--config keymap/rynsf.conf] [--random 200] [--seed 1] [--pins N] [--jobs J]
   --pins N: replay the first N scripts through the pin-level matrix scan (slow) instead
             of writing the scan result directly.
 """
@@ -19,6 +19,8 @@ import random
 import subprocess
 import sys
 import tempfile
+import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -47,6 +49,8 @@ def main():
     ap.add_argument("--random", type=int, default=200)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--pins", type=int, default=0)
+    ap.add_argument("--jobs", type=int, default=min(12, os.cpu_count() or 1),
+                    help="simulators run side by side")
     args = ap.parse_args()
     config = (ROOT / args.config).resolve()
 
@@ -57,29 +61,35 @@ def main():
                 else difftest.random_script(rng, rng.randint(2, 24)))
         scripts.append((f"random-{args.seed}-{i}", text))
 
-    sim = K630Sim()
+    def run_one(job):
+        """One script, in its own freshly booted simulator (no state shared between scripts)."""
+        n, name, text = job
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.keys"
+            path.write_text(text)
+            want = oracle(config, path)
+        sim = K630Sim()
+        try:
+            sim.boot_configured()
+            sim.paint_stack()
+            got = [tuple(e) for e in sim.play(text, direct=n >= args.pins)]
+            used = sim.stack_highwater()
+        finally:
+            sim.close()
+        return name, text, want, got, used
+
+    # The simulator is latency-bound (one socket round trip per command, ~1% CPU), so
+    # several sessions run side by side; each script still gets its own fresh boot.
+    jobs = [(n, name, text) for n, (name, text) in enumerate(scripts) if "compose" not in text]
     fails = []
     peak = (0, None)  # deepest stack seen: (bytes, script)
-    try:
-        with tempfile.TemporaryDirectory() as tmp:
-            for n, (name, text) in enumerate(scripts):
-                if "compose" in text:
-                    continue
-                path = Path(tmp) / "s.keys"
-                path.write_text(text)
-                want = oracle(config, path)
-                sim.close()
-                sim = K630Sim()
-                sim.boot_configured()
-                sim.paint_stack()
-                got = sim.play(text, direct=n >= args.pins)
-                used = sim.stack_highwater()
-                if used > peak[0]:
-                    peak = (used, name)
-                if [tuple(e) for e in got] != want:
-                    fails.append((name, text, want, got))
-    finally:
-        sim.close()
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        for name, text, want, got, used in pool.map(run_one, jobs):
+            if used > peak[0]:
+                peak = (used, name)
+            if got != want:
+                fails.append((name, text, want, got))
+    scripts = jobs
 
     print(f"firmware vs keyd: {len(scripts) - len(fails)}/{len(scripts)} identical "
           f"(seed {args.seed}, first {args.pins} via pin-level scan)")

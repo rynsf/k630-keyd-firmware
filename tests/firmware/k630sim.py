@@ -99,6 +99,25 @@ class K630Sim(Air60Sim):
         self._consumer = 0
         self.events = []        # decoded (keyd name, 'down'|'up')
 
+    def close(self):
+        """Stop the simulator outright. (smk's session sends `quit`, but uCsim only closes
+        that console connection and keeps running, so every close waited out a 3 s timeout.)"""
+        for step in (self.sock.close, self.proc.kill):
+            try:
+                step()
+            except OSError:
+                pass
+        try:
+            self.proc.wait(timeout=5)
+        except Exception:
+            pass
+        try:
+            self.proc.stderr.close()
+        except Exception:
+            pass
+        if self._serr_thread.is_alive():
+            self._serr_thread.join(timeout=1)
+
     # --- boot / clock ------------------------------------------------------------------
     def boot_configured(self):
         self.boot(usb=True)
@@ -113,6 +132,7 @@ class K630Sim(Air60Sim):
         scan must be off then, or it overwrites matrix[] with the idle pins."""
         ie = self.get_sfr(self.IE)
         self.set_sfr(self.IE, (ie | self.ET2) if on else (ie & ~self.ET2))
+        self._isr_on = on
 
     def set_ms(self, ms):
         self.sof = ms & 0xFFFF
@@ -124,6 +144,8 @@ class K630Sim(Air60Sim):
         self.loop(2)
 
     # --- running ----------------------------------------------------------------------
+    _isr_on = False
+
     def loop(self, n=1):
         """Run n main-loop passes (stopping at kb_update each time)."""
         self.brk(self._a("kb_update"))
@@ -160,11 +182,15 @@ class K630Sim(Air60Sim):
     def key(self, name, down, direct=True):
         pos = POS[name]
         (self.matrix.pressed.add if down else self.matrix.pressed.discard)(pos)
-        self.scan_isr(not direct)
         if direct:
             self.set_matrix_direct()
         else:
+            # The scan ISR runs only while its row reads are served from the matrix here;
+            # otherwise (e.g. during clock advances) a scan would read stale pin levels.
+            # With it off, matrix[] keeps the last real scan, as for keys held still.
+            self.scan_isr(True)
             self.scan()
+            self.scan_isr(False)
 
     # --- output decoding ----------------------------------------------------------------
     def _diff(self, mods, keys):
