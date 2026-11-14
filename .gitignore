@@ -6,3 +6,4 @@ tools/sdcc-*/
 re/out/
 __pycache__/
 firmware/redragon-k630/kd_config_gen.c*
+tests/failures/
