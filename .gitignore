@@ -3,3 +3,5 @@ target/
 build/
 tools/bin/
 tools/sdcc-*/
+re/out/
+__pycache__/
