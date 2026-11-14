@@ -116,22 +116,65 @@ static bool      timer_armed;
 
 #define TIME_GE(a, b) ((int32_t)((uint32_t)(a) - (uint32_t)(b)) >= 0)
 
-static void engine_feed(uint8_t code, uint8_t pressed, kd_time_t t)
+// These run only from the main loop, one at a time, so their arguments live in static
+// memory: on the 8051 every pushed argument byte is internal stack the engine needs.
+static kd_time_t feed_t;
+static uint8_t   feed_code, feed_pressed;
+
+static kd_time_t feed_next;
+
+static void engine_feed(void)
 {
-    const kd_time_t next = kd_event(code, pressed, t);
-    timer_armed          = next > 0;
-    deadline             = t + next;
+    feed_next   = kd_event(feed_code, feed_pressed, feed_t);
+    timer_armed = feed_next > 0;
+    deadline    = feed_t + feed_next;
 }
 
 // A due timeout fires first, at its own deadline, exactly as keyd's daemon loop does.
-static void engine_timeouts(kd_time_t t)
+static kd_time_t timeouts_until;
+
+static void engine_timeouts(void)
 {
-    while (timer_armed && TIME_GE(t, deadline)) {
-        engine_feed(0, 0, deadline);
+    while (timer_armed && TIME_GE(timeouts_until, deadline)) {
+        feed_code    = 0;
+        feed_pressed = 0;
+        feed_t       = deadline;
+        engine_feed();
     }
 }
 
+// The engine never runs inside smk's key handler and never sends reports itself: input
+// events and engine outputs go through two queues, drained from kb_update(). That keeps
+// the deepest engine path short, because on the 8051 every call level costs internal stack
+// (~220 bytes, shared with the USB interrupt).
+#define IN_Q  16 // key events from one matrix pass
+#define OUT_Q 64 // engine outputs from one batch of input
+struct in_ev {
+    uint8_t   hid, pressed;
+    kd_time_t t;
+};
+struct out_ev {
+    uint8_t code, pressed;
+};
+static __xdata struct in_ev  in_q[IN_Q];
+static __xdata struct out_ev out_q[OUT_Q];
+static uint8_t               in_head, in_tail, out_head, out_tail;
+uint8_t                      k630_queue_overflow; // non-zero: an event was dropped (tests assert 0)
+
 static void engine_key(uint8_t hid, uint8_t pressed)
+{
+    const uint8_t next = (uint8_t)((in_head + 1) & (IN_Q - 1));
+    if (next == in_tail) {
+        k630_queue_overflow |= 1;
+        return;
+    }
+    in_q[in_head].hid     = hid;
+    in_q[in_head].pressed = pressed;
+    in_q[in_head].t       = clock_now();
+    in_head               = next;
+}
+
+static void engine_input(uint8_t hid, uint8_t pressed)
 {
     uint8_t code;
 
@@ -146,12 +189,28 @@ static void engine_key(uint8_t hid, uint8_t pressed)
         return;
     }
 
-    const kd_time_t t = clock_now();
-    engine_timeouts(t);
-    engine_feed(code, pressed, t);
+    // the queued event at in_tail: first the timeouts due before it, then the event
+    timeouts_until = in_q[in_tail].t;
+    engine_timeouts();
+    feed_t       = in_q[in_tail].t;
+    feed_code    = code;
+    feed_pressed = pressed;
+    engine_feed();
 }
 
 void kd_output(uint8_t code, uint8_t pressed)
+{
+    const uint8_t next = (uint8_t)((out_head + 1) & (OUT_Q - 1));
+    if (next == out_tail) {
+        k630_queue_overflow |= 2;
+        return;
+    }
+    out_q[out_head].code    = code;
+    out_q[out_head].pressed = pressed;
+    out_head                = next;
+}
+
+static void send_output(uint8_t code, uint8_t pressed)
 {
     const uint8_t hid = keyd_to_hid[code];
 
@@ -293,7 +352,17 @@ void kb_update(void)
             marker_write(false); // this start is healthy: a later watchdog reset just reboots
         }
     }
-    engine_timeouts(clock_now());
+    // queued keys first, in order: each fires only the timeouts due before its own time
+    while (in_tail != in_head) {
+        engine_input(in_q[in_tail].hid, in_q[in_tail].pressed);
+        in_tail = (uint8_t)((in_tail + 1) & (IN_Q - 1));
+    }
+    timeouts_until = clock_now();
+    engine_timeouts();
+    while (out_tail != out_head) {
+        send_output(out_q[out_tail].code, out_q[out_tail].pressed);
+        out_tail = (uint8_t)((out_tail + 1) & (OUT_Q - 1));
+    }
 }
 
 void kb_send_report(__xdata report_keyboard_t *report)

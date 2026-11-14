@@ -218,7 +218,42 @@ class TestResources(K630Case):
         self.assertLess(used, avail - 32, "keep at least 32 bytes of stack headroom")
 
 
+def stack_bound():
+    """Static worst case (main loop + deepest ISR) and the stack available, from the image's
+    assembly (tests/firmware/stack_bound.py)."""
+    build = Path(FIRMWARE).parent
+    subprocess.run([str(HERE / "sdcclib.sh")], check=True, capture_output=True)
+    p = subprocess.run([sys.executable, str(HERE / "stack_bound.py"), "222",
+                        str(Path(FIRMWARE).with_suffix(".ihx.p")), str(build / "user.lib.p"),
+                        str(build / "sdcclib.asm.p")], capture_output=True, text=True)
+    m = re.search(r"worst case main \+ deepest ISR: (\d+) of (\d+)", p.stdout)
+    assert m, p.stdout + p.stderr
+    main = int(re.search(r"main loop worst case: (\d+)", p.stdout).group(1))
+    return int(m.group(1)), int(m.group(2)), main, p.stdout
+
+
 class TestImage(unittest.TestCase):
+    def test_static_stack_bound_has_headroom(self):
+        """Every call path, not just the ones the scripts reach: main loop worst case plus
+        the deepest interrupt (they share one priority, so ISRs cannot nest)."""
+        worst, avail, _, out = stack_bound()
+        print("\n  " + out.strip().replace("\n", "\n  "))
+        self.assertLessEqual(worst + 32, avail, "keep at least 32 bytes of stack headroom")
+
+    def test_measured_peak_within_static_bound(self):
+        """Sanity check of the analysis: what the simulator measures must never exceed it."""
+        _, _, main, _ = stack_bound()
+        s = K630Sim()
+        try:
+            s.boot_configured()
+            s.brk(s._a("kb_update")); s.run(); s.cmd("delete")
+            s.paint_stack()
+            s.play((ROOT / "tests/firmware/deep-2-27.keys").read_text())
+            used = s.stack_highwater()
+        finally:
+            s.close()
+        self.assertLessEqual(used, main)
+
     def test_no_flash_write_code(self):
         p = subprocess.run([sys.executable, str(HERE / "check_no_flash_write.py"), FIRMWARE],
                            capture_output=True, text=True)

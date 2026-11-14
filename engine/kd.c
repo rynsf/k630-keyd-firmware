@@ -409,9 +409,17 @@ static void process_descriptor(uint8_t code, const struct desc *d, int8_t dl, ui
 static void process_descriptor(uint8_t code, const struct desc *d, int8_t dl, uint8_t pressed,
 			       kd_time_t time)
 {
-	uint8_t idx, mods, new_code;
-	struct desc action;
+	KD_SCRATCH uint8_t idx, mods, new_code, taps;
+	KD_SCRATCH struct desc action, tap;
 
+	/*
+	 * keyd taps an overload's action by calling process_descriptor on it twice (press,
+	 * release). Here that replay runs as two more passes of this loop instead, so the
+	 * function never recurses and its locals can be static. Same order: each pass ends
+	 * with the last_pressed_code update below, as each recursive call did.
+	 */
+	taps = 0;
+again:
 	switch (d->op) {
 	case KD_OP_KEYSEQUENCE:
 		new_code = d->a0;
@@ -490,8 +498,8 @@ static void process_descriptor(uint8_t code, const struct desc *d, int8_t dl, ui
 			if (kbd.last_pressed_code == code &&
 			    (!kd_cfg.overload_tap_timeout ||
 			     ((time - kbd.overload_start_time) < (kd_time_t)kd_cfg.overload_tap_timeout))) {
-				process_descriptor(code, &action, dl, 1, time);
-				process_descriptor(code, &action, dl, 0, time);
+				tap = action;
+				taps = 2;
 			}
 		}
 		break;
@@ -532,6 +540,13 @@ static void process_descriptor(uint8_t code, const struct desc *d, int8_t dl, ui
 
 	if (pressed)
 		kbd.last_pressed_code = code;
+
+	if (taps) {
+		d = &tap;
+		pressed = taps == 2;
+		taps--;
+		goto again;
+	}
 }
 
 /* Pushes a frame with the queued events; the driver loop runs it. */
@@ -559,17 +574,18 @@ static void push_flush(const struct key_event KD_XDATA *queue, uint8_t queue_sz)
 
 static uint8_t handle_pending_overload(uint8_t code, uint8_t pressed, kd_time_t time)
 {
-	struct desc action;
+	KD_SCRATCH struct desc action;
+	KD_SCRATCH struct key_event KD_XDATA *ev;
+	KD_SCRATCH uint8_t i, found, pcode;
+	KD_SCRATCH int8_t dl;
+	KD_SCRATCH struct cache_entry ce;
 
 	if (!kbd.pending_overload.code)
 		return 0;
 
 	if (code) {
-		struct key_event KD_XDATA *ev;
-
 		if (!pressed) {
-			uint8_t i;
-			uint8_t found = 0;
+			found = 0;
 
 			for (i = 0; i < kbd.pending_overload.queue_sz; i++)
 				if (kbd.pending_overload.queue[i].code == code)
@@ -601,9 +617,8 @@ static uint8_t handle_pending_overload(uint8_t code, uint8_t pressed, kd_time_t 
 		action.op = 0;
 
 	if (action.op) {
-		uint8_t pcode = kbd.pending_overload.code;
-		int8_t dl = kbd.pending_overload.dl;
-		struct cache_entry ce;
+		pcode = kbd.pending_overload.code;
+		dl = kbd.pending_overload.dl;
 
 		kbd.pending_overload.code = 0;
 
@@ -688,8 +703,12 @@ static void frame_finish_call(struct frame KD_XDATA *f, uint8_t was_timeout, kd_
 
 kd_time_t kd_event(uint8_t code, uint8_t pressed, kd_time_t t)
 {
-	kd_time_t result = 0;
+	KD_SCRATCH kd_time_t result, time;
+	KD_SCRATCH struct frame KD_XDATA *f;
+	KD_SCRATCH const struct key_event KD_XDATA *ev;
+	KD_SCRATCH uint8_t is_timeout;
 
+	result = 0;
 	nr_frames = 1;
 	frames[0].ev[0].code = code;
 	frames[0].ev[0].pressed = pressed;
@@ -701,10 +720,7 @@ kd_time_t kd_event(uint8_t code, uint8_t pressed, kd_time_t t)
 	frames[0].waiting = 0;
 
 	while (nr_frames) {
-		struct frame KD_XDATA *f = &frames[nr_frames - 1];
-		const struct key_event KD_XDATA *ev;
-		uint8_t is_timeout;
-		kd_time_t time;
+		f = &frames[nr_frames - 1];
 
 		if (f->waiting) {
 			f->waiting = 0;
