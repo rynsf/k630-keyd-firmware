@@ -63,6 +63,13 @@ for t in sdcc sdar packihx sdas8051 sdld sdcpp; do
     ln -sf "$ROOT/tools/sdcc-$SDCC_VER/bin/$t" "$ROOT/tools/bin/$t"
 done
 
+# smk core changes for the K630 (early-boot hook, bounded PLL wait, SOF ms clock, no-flash
+# nvm, flash.c out of release images) and the board itself, linked into smk's tree
+if ! git -C "$TP/smk" apply --reverse --check "$ROOT/firmware/smk.patch" 2>/dev/null; then
+    git -C "$TP/smk" apply "$ROOT/firmware/smk.patch"
+fi
+ln -sfn ../../../../firmware/redragon-k630 "$TP/smk/src/keyboards/redragon-k630"
+
 # keyd oracle, config export, engine host build
 (cd "$ROOT" && make tools)
 

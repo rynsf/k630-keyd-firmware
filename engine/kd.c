@@ -44,6 +44,13 @@
 #define MOD_SUPER 0x2
 #define MOD_ALT 0x1
 
+/*
+ * Locals of non-recursive functions that are only active once at a time live in static
+ * storage, not on the stack: with SDCC's --stack-auto every local otherwise lands on the
+ * 8051's ~220-byte internal stack. Same on the host, so the difftests cover this code.
+ */
+#define KD_SCRATCH static
+
 #define TIME_GE(a, b) ((int32_t)((uint32_t)(a) - (uint32_t)(b)) >= 0)
 #define TIME_GT(a, b) ((int32_t)((uint32_t)(a) - (uint32_t)(b)) > 0)
 
@@ -280,15 +287,17 @@ static uint8_t layer_lookup(uint8_t layer, uint8_t code, struct desc *d)
 
 static void lookup_descriptor(uint8_t code, struct desc *d, int8_t *dl)
 {
-	uint8_t i;
-	int32_t maxts = 0;
-	struct desc tmp;
+	KD_SCRATCH uint8_t i;
+	KD_SCRATCH int32_t maxts;
+	KD_SCRATCH int32_t activation_time;
+	KD_SCRATCH struct desc tmp;
 
+	maxts = 0;
 	d->op = 0;
 
 	for (i = 0; i < kd_cfg.nr_layers; i++) {
 		if (kbd.layer_state[i].active) {
-			int32_t activation_time = kbd.layer_state[i].activation_time;
+			activation_time = kbd.layer_state[i].activation_time;
 			if (layer_lookup(i, code, &tmp) && activation_time >= maxts) {
 				maxts = activation_time;
 				*d = tmp;
@@ -374,9 +383,12 @@ static void schedule_timeout(kd_time_t timeout)
 
 static kd_time_t calculate_main_loop_timeout(kd_time_t time)
 {
-	uint8_t i, n = 0;
-	kd_time_t timeout = 0;
-	uint8_t have = 0;
+	KD_SCRATCH uint8_t i, n, have;
+	KD_SCRATCH kd_time_t timeout;
+
+	n = 0;
+	timeout = 0;
+	have = 0;
 
 	for (i = 0; i < kbd.nr_timeouts; i++)
 		if (TIME_GT(kbd.timeouts[i], time)) {
@@ -627,11 +639,12 @@ static uint8_t process_event_begin(uint8_t code, uint8_t pressed, kd_time_t time
 	}
 
 	if (code) {
-		struct desc d;
-		int8_t dl = 0;
+		KD_SCRATCH struct desc d;
+		KD_SCRATCH int8_t dl;
 
+		dl = 0;
 		if (pressed) {
-			struct cache_entry ce;
+			KD_SCRATCH struct cache_entry ce;
 
 			if (cache_get(code))
 				return 0;

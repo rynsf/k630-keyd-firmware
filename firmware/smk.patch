@@ -1,0 +1,205 @@
+diff --git a/meson.build b/meson.build
+index 3a88ee2..e82b698 100644
+--- a/meson.build
++++ b/meson.build
+@@ -317,6 +317,9 @@ foreach keyboard, board : keyboards
+ 
+     foreach layout, variant : board['layouts']
+         src_main = src_smk + src_libc + spec['src']
++        if options.get('nvm', '') == 'flash' or get_option('buildtype') == 'debug'
++            src_main += spec.get('src_flash', [])  # release builds without flash nvm carry no flash-write code
++        endif
+         inc_dirs = inc_base + [spec['dir']]
+ 
+         cc_args = cc_base_args + platform_cc_args + [
+diff --git a/src/keyboards/meson.build b/src/keyboards/meson.build
+index 17fc53b..d370c5e 100644
+--- a/src/keyboards/meson.build
++++ b/src/keyboards/meson.build
+@@ -5,3 +5,4 @@ subdir('nuphy-air60')
+ subdir('eyooso-z11')
+ subdir('genesis-thor-300')
+ subdir('ciy-x77')
++subdir('redragon-k630')
+diff --git a/src/main.c b/src/main.c
+index 620b005..3d329d6 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -25,6 +25,7 @@
+ #endif
+ void init(void)
+ {
++    board_early_boot(); // K630: boot escape + watchdog fallback, before anything else
+     reset_init();
+     ldo_init();
+     clock_init();
+diff --git a/src/nvm/meson.build b/src/nvm/meson.build
+index c15edea..87bd3b7 100644
+--- a/src/nvm/meson.build
++++ b/src/nvm/meson.build
+@@ -1 +1,2 @@
+ subdir('flash')
++subdir('none')
+diff --git a/src/nvm/none/meson.build b/src/nvm/none/meson.build
+new file mode 100644
+index 0000000..1124380
+--- /dev/null
++++ b/src/nvm/none/meson.build
+@@ -0,0 +1,7 @@
++nvm_modules += {
++    'none' : {
++        'src' : files('nvm.c'),
++        'inc' : [meson.current_source_dir()],
++        'args' : [],
++    },
++}
+diff --git a/src/nvm/none/nvm.c b/src/nvm/none/nvm.c
+new file mode 100644
+index 0000000..e474147
+--- /dev/null
++++ b/src/nvm/none/nvm.c
+@@ -0,0 +1,14 @@
++#include "nvm.h"
++
++bool nvm_load(__xdata uint8_t *dst, uint8_t len)
++{
++    dst;
++    len;
++    return false;
++}
++
++void nvm_save(const __xdata uint8_t *src, uint8_t len)
++{
++    src;
++    len;
++}
+diff --git a/src/nvm/none/nvm.h b/src/nvm/none/nvm.h
+new file mode 100644
+index 0000000..090d196
+--- /dev/null
++++ b/src/nvm/none/nvm.h
+@@ -0,0 +1,9 @@
++#pragma once
++
++#include <stdbool.h>
++#include <stdint.h>
++
++// No persistent storage: the firmware never writes flash. Settings still fit their struct.
++#define NVM_CAPACITY 255u
++bool nvm_load(__xdata uint8_t *dst, uint8_t len);
++void nvm_save(const __xdata uint8_t *src, uint8_t len);
+diff --git a/src/sino51lib/sh68f90/clock.c b/src/sino51lib/sh68f90/clock.c
+index 00c7d8b..57dc055 100644
+--- a/src/sino51lib/sh68f90/clock.c
++++ b/src/sino51lib/sh68f90/clock.c
+@@ -2,14 +2,27 @@
+ #include "sh68f90.h"
+ #include "delay.h"
+ #include "watchdog.h"
++#ifdef ISP_ENABLE
++#    include "isp.h"
++#endif
++
++// A PLL that never reports lock must not hang the part: give up and enter ISP.
++#define PLL_LOCK_SPINS 60000u
+ 
+ void clock_init()
+ {
+     CLKCON = _HFON;
+     PLLCON = _PLLON;
+ 
+-    while (!(PLLCON & _PLLSTA)) {
++    for (uint16_t spins = 0; !(PLLCON & _PLLSTA); spins++) {
+         watchdog_kick();
++        if (spins >= PLL_LOCK_SPINS) {
++#ifdef ISP_ENABLE
++            isp_jump();
++#else
++            break;
++#endif
++        }
+     }
+ 
+     PLLCON |= _PLLFS;
+diff --git a/src/sino51lib/sh68f90/meson.build b/src/sino51lib/sh68f90/meson.build
+index 15fbe8f..5170b84 100644
+--- a/src/sino51lib/sh68f90/meson.build
++++ b/src/sino51lib/sh68f90/meson.build
+@@ -6,7 +6,8 @@ platforms += {
+         'example_systick' : files('systick.c'),
+         'example_power' : files('power.c', 'extint.c'),
+         'boot_core' : src_flash + files('clock.c', 'peripherals.c'),
+-        'src' : src_flash + files(
++        'src_flash' : src_flash,
++        'src' : files(
+             'clock.c',
+             'diag_info.c',
+             'usbhw.c',
+diff --git a/src/smk/usb.c b/src/smk/usb.c
+index 4365630..97c421a 100644
+--- a/src/smk/usb.c
++++ b/src/smk/usb.c
+@@ -379,6 +379,8 @@ static __bit            ep0_address_pending;
+ #define ENUM_GIVE_UP_MS 4000
+ 
+ static volatile uint16_t enum_quiet_ticks;
++
++volatile uint16_t usb_sof_ms;
+ static volatile bool     enum_seen;
+ 
+ static void usb_reset_state(void)
+@@ -520,6 +522,7 @@ void usb_irq_dispatch(void)
+             enum_quiet_ticks--;
+         }
+         usb_suspended = 0; // a SOF means the host is driving the bus again
++        usb_sof_ms++;      // full-speed SOF: exactly one per millisecond
+     }
+ 
+     if (if1 & _RESMIF) {
+diff --git a/src/smk/usb.h b/src/smk/usb.h
+index b3db845..fe82a24 100644
+--- a/src/smk/usb.h
++++ b/src/smk/usb.h
+@@ -25,6 +25,9 @@ void usb_wait_for_enumeration(void);
+ // runs what the USB interrupt defers to the main loop: currently the jump into the ISP bootloader.
+ void usb_task(void);
+ 
++// Incremented by every USB start-of-frame (1 ms) while the host drives the bus.
++extern volatile uint16_t usb_sof_ms;
++
+ // the part of the USB interrupt that does not vary by part; the vector calls it inside its own banking prologue.
+ void usb_irq_dispatch(void);
+ 
+diff --git a/src/user/board_early_boot.c b/src/user/board_early_boot.c
+new file mode 100644
+index 0000000..b5facae
+--- /dev/null
++++ b/src/user/board_early_boot.c
+@@ -0,0 +1,3 @@
++#include "user_init.h"
++
++void board_early_boot(void) {}
+diff --git a/src/user/meson.build b/src/user/meson.build
+index 0d4bd77..0c90f79 100644
+--- a/src/user/meson.build
++++ b/src/user/meson.build
+@@ -12,6 +12,7 @@ src_user += src_user_matrix_defaults
+ 
+ src_user += files(
+     'user_init.c',
++    'board_early_boot.c',
+     'layout_process_record.c',
+     'indicators_start.c',
+     'indicators_pre_update.c',
+diff --git a/src/user/user_init.h b/src/user/user_init.h
+index c3efc3d..955cc13 100644
+--- a/src/user/user_init.h
++++ b/src/user/user_init.h
+@@ -4,4 +4,7 @@
+ 
+ void user_init();
+ 
++// Runs first in init(), before clocks/USB. Default: nothing.
++void board_early_boot(void);
++
+ void user_gpio_init(void);
