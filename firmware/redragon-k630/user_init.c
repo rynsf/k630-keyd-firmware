@@ -33,7 +33,7 @@ void user_gpio_init(void)
     GPIO_DIR_WRITE(3, (uint8_t)(KB_C8_P3_0 | KB_C9_P3_1 | KB_C10_P3_2 | KB_C11_P3_3 | KB_C12_P3_4 | KB_C13_P3_5));
     GPIO_DIR_WRITE(4, (uint8_t)(_P4_4));
     GPIO_DIR_WRITE(5, (uint8_t)(_P5_5 | _P5_6));
-    GPIO_DIR_WRITE(6, (uint8_t)(LED_R0_P6_1 | LED_R1_P6_2 | LED_R2_P6_3 | LED_R3_P6_4 | LED_R4_P6_5));
+    GPIO_DIR_WRITE(6, (uint8_t)(_P6_0 | LED_R0_P6_1 | LED_R1_P6_2 | LED_R2_P6_3 | LED_R3_P6_4 | LED_R4_P6_5));
     GPIO_DIR_WRITE(7, (uint8_t)(_P7_5));
 
     // row inputs pulled up
@@ -44,7 +44,7 @@ void user_gpio_init(void)
     GPIO_WRITE(0, (uint8_t)(_P0_2 | _P0_4));
     GPIO_WRITE(4, 0);
     GPIO_LOW(5, (uint8_t)(_P5_5 | _P5_6));
-    GPIO_WRITE(6, LED_R0_P6_1 | LED_R1_P6_2 | LED_R2_P6_3 | LED_R3_P6_4 | LED_R4_P6_5);
+    GPIO_WRITE(6, _P6_0 | LED_R0_P6_1 | LED_R1_P6_2 | LED_R2_P6_3 | LED_R3_P6_4 | LED_R4_P6_5);
     GPIO_HIGH(7, (uint8_t)(_P7_5));
 }
 
@@ -56,6 +56,8 @@ static void user_pwm_init(void) // as the stock firmware (0x1792...): duty1 = du
     PWM1PERDL = PWM_PERDL_INIT;
     PWM2PERDH = PWM_PERDH_INIT;
     PWM2PERDL = PWM_PERDL_INIT;
+    PWM4PERDH = PWM_PERDH_INIT;
+    PWM4PERDL = PWM_PERDL_INIT;
 
     SET_PWM_DUTY(LED_PWM_C0, 0, 0);
     SET_PWM_DUTY(LED_PWM_C1, 0, 0);
@@ -71,6 +73,13 @@ static void user_pwm_init(void) // as the stock firmware (0x1792...): duty1 = du
     SET_PWM_DUTY(LED_PWM_C11, 0, 0);
     SET_PWM_DUTY(LED_PWM_C12, 0, 0);
     SET_PWM_DUTY(LED_PWM_C13, 0, 0);
+    SET_PWM_DUTY(PWM20, 0, 0); // the stock grid's extra LED columns (backlight.c)
+    SET_PWM_DUTY(PWM21, 0, 0);
+    SET_PWM_DUTY(PWM22, 0, 0);
+    SET_PWM_DUTY(PWM23, 0, 0);
+    SET_PWM_DUTY(PWM40, 0, 0);
+    SET_PWM_DUTY(PWM41, 0, 0);
+    SET_PWM_DUTY(PWM42, 0, 0);
 }
 
 void user_init()

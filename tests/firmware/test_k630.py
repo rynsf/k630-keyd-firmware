@@ -302,15 +302,18 @@ class TestBacklight(K630Case):
                          oracle("a down\n20ms\na up\n"))
 
     def test_every_column_channel_is_pwm_enabled(self):
-        """All 14 column channels under PWM (stock 0x8A), not just the first of each bank."""
+        """Every LED column channel of the stock grid under PWM (stock 0x8A)."""
         s = self.s
         s.scan_isr(True)
         s.loop(10)                                   # main loop: PWM re-enabled after each tick
         s.scan_isr(False)
         h = (ROOT / "third_party/smk/src/sino51lib/sh68f90/sh68f90.h").read_text()
-        for ch in "00 01 02 03 04 05 10 11 12 13 14 15 24 25".split():
-            a = int(re.search(r"SFRX\(PWM%sCON,\s*(0x[0-9a-fA-F]+)\)" % ch, h).group(1), 16)
-            self.assertEqual(s.get_xram(a, 1)[0] & 0x8A, 0x8A, "PWM%sCON" % ch)
+        # the 14 key columns + the stock grid's extra LED columns (20-23, 40-42)
+        for ch in "00 01 02 03 04 05 10 11 12 13 14 15 20 21 22 23 24 25 40 41 42".split():
+            m = re.search(r"SFR(X?)\(PWM%sCON,\s*(0x[0-9a-fA-F]+)\)" % ch, h)
+            a = int(m.group(2), 16)
+            v = s.get_xram(a, 1)[0] if m.group(1) else s.get_sfr(a)
+            self.assertEqual(v & 0x8A, 0x8A, "PWM%sCON" % ch)
 
     def test_side_caps_led_pin_is_never_driven(self):
         self.assertFalse(self.s.get_sfr(0xE1) & 0x08, "P0.3 must stay an input (P0CR bit 3 clear)")

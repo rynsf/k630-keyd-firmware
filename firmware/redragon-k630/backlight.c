@@ -21,17 +21,23 @@
 #include "usb.h"
 #include "backlight.h"
 
-#define LED_ROWS 5
+// The stock firmware drives a 6 x 21 LED grid (it is a generic full-size build): rows
+// P6.0-P6.5, columns = the 14 key-column channels + PWM20-23 + PWM40-42. Not every K630
+// LED sits at its key's matrix position (key 4's LED is on one of the extra lines: dark
+// with only the 14 x 5 key grid), so "all on" drives the whole stock grid, as stock does.
+#define LED_ROWS 6 // P6.0 .. P6.5; key row r is LED row r + 1
 // stock: duty = level * 50 * 14 for levels 1..5, out of the period 0x0DFC (3580)
 #define LED_DUTY_STEP 700u
 #define COL_P1        (uint8_t)(KB_C0_P1_4 | KB_C1_P1_5)
 #define COL_P2        (uint8_t)(KB_C2_P2_0 | KB_C3_P2_1 | KB_C4_P2_2 | KB_C5_P2_3 | KB_C6_P2_4 | KB_C7_P2_5)
 #define COL_P3        (uint8_t)(KB_C8_P3_0 | KB_C9_P3_1 | KB_C10_P3_2 | KB_C11_P3_3 | KB_C12_P3_4 | KB_C13_P3_5)
+#define XCOL_P1       (uint8_t)(_P1_0 | _P1_1 | _P1_2 | _P1_3) // stock LED columns 14-17
+#define XCOL_P5       (uint8_t)(_P5_0 | _P5_1 | _P5_2)         // stock LED columns 18-20
 #define PWM_CON_COL   0x8A // stock: MODE_ENABLE | SS | CLK/4, on every column channel
 
-#define LED_ALL_ROWS (uint8_t)(LED_R0_P6_1 | LED_R1_P6_2 | LED_R2_P6_3 | LED_R3_P6_4 | LED_R4_P6_5)
+#define LED_ALL_ROWS (uint8_t)(_P6_0 | LED_R0_P6_1 | LED_R1_P6_2 | LED_R2_P6_3 | LED_R3_P6_4 | LED_R4_P6_5)
 
-#define CAPS_ROW 2
+#define CAPS_ROW 3 // LED row of key row 2 (P6.3)
 #define CAPS_COL 0
 
 
@@ -73,8 +79,10 @@ void indicators_pre_update()
     indicators_pwm_disable();
     // hand the column pins to the PWM block (stock 0x427A); user_matrix_scan_pre() takes
     // them back before every matrix scan
-    GPIO_INPUT(1, COL_P1);
-    GPIO_PULLUP_OFF(1, COL_P1);
+    GPIO_INPUT(1, (uint8_t)(COL_P1 | XCOL_P1));
+    GPIO_PULLUP_OFF(1, (uint8_t)(COL_P1 | XCOL_P1));
+    GPIO_INPUT(5, XCOL_P5);
+    GPIO_PULLUP_OFF(5, XCOL_P5);
     GPIO_INPUT(2, COL_P2);
     GPIO_PULLUP_OFF(2, COL_P2);
     GPIO_INPUT(3, COL_P3);
@@ -97,24 +105,34 @@ static void set_all_columns(uint16_t duty)
     SET_PWM_DUTY_2(LED_PWM_C11, duty);
     SET_PWM_DUTY_2(LED_PWM_C12, duty);
     SET_PWM_DUTY_2(LED_PWM_C13, duty);
+    SET_PWM_DUTY_2(PWM23, duty); // stock LED columns 14-17
+    SET_PWM_DUTY_2(PWM22, duty);
+    SET_PWM_DUTY_2(PWM21, duty);
+    SET_PWM_DUTY_2(PWM20, duty);
+    SET_PWM_DUTY_2(PWM40, duty); // stock LED columns 18-20
+    SET_PWM_DUTY_2(PWM41, duty);
+    SET_PWM_DUTY_2(PWM42, duty);
 }
 
 static void enable_row(uint8_t row)
 {
     switch (row) {
         case 0:
-            LED_R0 = 0;
+            P6_0 = 0;
             break;
         case 1:
-            LED_R1 = 0;
+            LED_R0 = 0;
             break;
         case 2:
-            LED_R2 = 0;
+            LED_R1 = 0;
             break;
         case 3:
-            LED_R3 = 0;
+            LED_R2 = 0;
             break;
         case 4:
+            LED_R3 = 0;
+            break;
+        case 5:
             LED_R4 = 0;
             break;
     }
@@ -170,8 +188,15 @@ void indicators_pwm_enable()
     PWM15CON = PWM_CON_COL;
 
     PWM20CON = PWM_CON_COL;
+    PWM21CON = PWM_CON_COL;
+    PWM22CON = PWM_CON_COL;
+    PWM23CON = PWM_CON_COL;
     PWM24CON = PWM_CON_COL;
     PWM25CON = PWM_CON_COL;
+
+    PWM40CON = PWM_CON_COL;
+    PWM41CON = PWM_CON_COL;
+    PWM42CON = PWM_CON_COL;
 }
 
 void indicators_pwm_disable()
@@ -191,6 +216,13 @@ void indicators_pwm_disable()
     PWM15CON = PWM_CON_OFF;
 
     PWM20CON = PWM_CON_PARKED;
+    PWM21CON = PWM_CON_OFF;
+    PWM22CON = PWM_CON_OFF;
+    PWM23CON = PWM_CON_OFF;
     PWM24CON = PWM_CON_OFF;
     PWM25CON = PWM_CON_OFF;
+
+    PWM40CON = PWM_CON_OFF;
+    PWM41CON = PWM_CON_OFF;
+    PWM42CON = PWM_CON_OFF;
 }
