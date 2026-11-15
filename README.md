@@ -11,8 +11,9 @@ keyd's own parser, and every image is checked against keyd itself in a simulator
 can be flashed.
 
 > **Warning.** Flashing custom firmware is at your own risk and may void your warranty.
-> The project is designed so the keyboard cannot be bricked (see [Safety](#safety)), but it
-> has been built and tested on **one** keyboard. Read this whole page before flashing.
+> The project is designed to make bricking very unlikely and to leave several ways back
+> (see [Safety](#safety)), but it cannot rule it out, and it has been built and tested on
+> **one** keyboard. Read this whole page before flashing.
 
 ## What you get
 
@@ -87,8 +88,9 @@ remapped twice:
 ## Safety
 
 The SH68F90A has a factory bootloader in the top 4 KB of flash that accepts new firmware
-over USB. It runs on every power-up and is never written by this project, so there is
-always a way back. On top of that, every image has to:
+over USB. It runs on every power-up and is never written by this project. sinowisp marks
+the firmware valid only as its last step, so an interrupted flash leaves the bootloader in
+update mode, ready to try again. On top of that, every image has to:
 
 - **never write flash**: `tests/firmware/check_no_flash_write.py` proves that no byte of
   the image encodes a write to the flash controller (the stock firmware fails this check,
@@ -99,6 +101,13 @@ always a way back. On top of that, every image has to:
 - pass the **simulator tests**: the real image runs in uCsim's SH68F90 model through boot,
   the escape hatches, USB, the Fn layers, the backlight, wakeup, worst-case stack use
   (statically bounded), and 1001 random key scripts compared against keyd.
+
+**What is not covered.** The three ways into update mode are the firmware's own code. An
+image broken so badly that it fails before its first instructions run (where the FN1
+check is) would leave only in-circuit programming: opening the keyboard and writing the
+chip directly with [sinodude](https://github.com/karstx/sinodude) and an Arduino Nano.
+The simulator boots every image before it can be flashed, precisely to catch that, but
+that last-resort path has not been tested on this keyboard.
 
 [`docs/HOW-IT-WORKS.md`](docs/HOW-IT-WORKS.md) explains the hardware and the firmware in
 detail. [`re/K630-HARDWARE.md`](re/K630-HARDWARE.md) is the hardware map recovered from the

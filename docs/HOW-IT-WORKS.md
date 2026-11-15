@@ -9,7 +9,7 @@ is switches, LEDs and wiring.
 |---|---|---|
 | CPU | 8051-compatible core (single-cycle) | An old, well-known architecture: the free compiler SDCC targets it, and uCsim simulates it. |
 | Program memory | 64 KB flash | Rewritable, so the keyboard's program is not fixed. |
-| Bootloader | 4 KB at the top of flash (`0xF000`), from the factory | Runs on every power-up and accepts new firmware over USB (the vendor's update path). This project only ever writes the 60 KB below it, so it cannot be damaged: there is always a way back. |
+| Bootloader | 4 KB at the top of flash (`0xF000`), from the factory | Runs on every power-up and accepts new firmware over USB (the vendor's update path). This project only ever writes the 60 KB below it and never writes flash from the firmware, so the bootloader stays intact. |
 | RAM | 256 bytes internal + 4 KB XRAM | Tiny: the call stack (~220 bytes) is analysed statically. |
 | USB | full-speed USB device, built in | The firmware talks to the computer directly. |
 | Pins + PWM | ~50 pins, 21 PWM channels | Switches and LEDs connect straight to the chip, with no driver chips. |
