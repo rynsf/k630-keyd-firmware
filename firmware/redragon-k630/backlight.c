@@ -18,7 +18,8 @@
 // the backlight off it is the only lit key, with the backlight on it is the only dark one.
 // The side Caps LED (P0.3, active low) is held off by user_init.c.
 //
-// Nothing is saved (no flash writes): every power-up starts on, at full brightness. While
+// Nothing is saved (no flash writes): every power-up starts with the backlight off (FN2 + 0
+// turns it on) at full brightness. While
 // the host has the USB bus suspended, everything is dark.
 #include "indicators.h"
 #include "sh68f90.h"
@@ -77,7 +78,7 @@ void backlight_dimmer(void)
 void indicators_start()
 {
     led_row              = 0;
-    k630_backlight_on    = 1;
+    k630_backlight_on    = 0; // off by default
     k630_backlight_level = BACKLIGHT_LEVELS;
     indicators_pwm_enable();
 }

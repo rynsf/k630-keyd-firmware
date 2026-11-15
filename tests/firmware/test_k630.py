@@ -236,15 +236,16 @@ class TestBacklight(K630Case):
     def state(self):
         return self.s.get_xram(self.on, 1)[0], self.s.get_xram(self.level, 1)[0]
 
-    def test_defaults_on_at_full_brightness(self):
-        self.assertEqual(self.state(), (1, 5))
+    def test_defaults_off_at_full_brightness(self):
+        self.assertEqual(self.state(), (0, 5))
 
     def test_fn2_combos(self):
         s = self.s
         s.play("FN2 down\n0 down\n0 up\nFN2 up\n")
-        self.assertEqual(self.state(), (0, 5), "FN2 + 0 turns it off")
+        self.assertEqual(self.state(), (1, 5), "FN2 + 0 turns it on")
         s.play("FN2 down\n0 down\n0 up\nFN2 up\n")
-        self.assertEqual(self.state(), (1, 5), "and on again")
+        self.assertEqual(self.state(), (0, 5), "and off again")
+        s.play("FN2 down\n0 down\n0 up\nFN2 up\n")
         s.play("FN2 down\n" + "- down\n- up\n" * 7 + "FN2 up\n")
         self.assertEqual(self.state(), (1, 1), "FN2 + - dims, stops at the lowest level")
         s.play("FN2 down\n= down\n= up\n= down\n= up\nFN2 up\n")
