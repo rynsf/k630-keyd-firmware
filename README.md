@@ -140,4 +140,3 @@ stock firmware. [`docs/DESIGN.md`](docs/DESIGN.md) is the project log, including
 
 GPL-2.0, the same as smk, on which the firmware is built (see `LICENSE`). `engine/` is a
 port of keyd and keeps keyd's MIT license (`engine/LICENSE.keyd`).
-Redragon's firmware, manuals and product images are not part of this repository.
