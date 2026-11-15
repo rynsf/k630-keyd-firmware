@@ -1,7 +1,7 @@
 # Redragon K630 (single-colour) — hardware map and stock firmware notes
 
 Derived from the stock firmware dump (`backup/k630-stock-firmware.hex`, firmware version
-bcdDevice 12.10) with `re/dis8051.py`, plus `lsusb -v` and keypress tests on the real
+bcdDevice 12.10; not in the repo, see `backup/README.md` to read your own) with `re/dis8051.py`, plus `lsusb -v` and keypress tests on the real
 keyboard. Addresses refer to that image. "Inferred" marks conclusions drawn from structure
 rather than traced code.
 
@@ -146,7 +146,7 @@ used, flag `0x24.6` clear), it sends App/Menu (`0x65`) on release (`0x6383`). Co
   software (keymap entry `[type, mod, usage, 0]`, handled at `0x47B9`).
 - **No speed key.** Speed (`0x1E`) is only loaded from settings, set by reset, or set
   over USB report 10.
-- **Cross-check with the manual** (`docs/manual/k630-pink-manual.pdf`, "REDRAGON K630 Pink
+- **Cross-check with the manual** (Redragon's PDF manual, not in the repo: `docs/manual/k630-pink-manual.pdf` locally, "REDRAGON K630 Pink
   Backlit"; `k630-dragonborn-manual.pdf` has the same content, "Dragonborn wired 61 key"):
   - All 15 FN1 entries match exactly.
   - FN1 + WIN lock matches.
@@ -159,7 +159,7 @@ used, flag `0x24.6` clear), it sends App/Menu (`0x65`) on release (`0x6383`). Co
     2. The manual says FN2 + ESC must be *held 3 s*, but `0x654A` resets on the press edge with
        no timer, so **a quick FN2 + Esc already factory-resets and writes flash**.
 
-- **Keycap legends** (`docs/images/k630-pink-product.jpg`, `k630-pink-top.webp`) agree:
+- **Keycap legends** (product photos, not in the repo) agree:
   - The bottom row reads Fn / "FN1" and ☰ / "FN2" (the Menu icon).
   - The front prints on number keys 1…= read F1…F12, matching FN1.
   - FN2 icons appear on 9 (mode), 0 (light on/off), − (dimmer) and = (brighter), with "MR" (macro record) on Backspace.

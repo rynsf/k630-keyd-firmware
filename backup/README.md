@@ -1,6 +1,16 @@
 # Redragon K630 (single-colour, pink) — stock flash backup
 
-Read on 2026-11-14 with sinowisp 2.1.0 (`-d redragon-k630-norgb`) over the stock ISP bootloader.
+**The stock firmware is not in this repository** (it is Redragon's / SinoWealth's code, not
+ours to redistribute; `backup/*.hex` and `*.bin` are gitignored). **Back up your own
+keyboard before flashing anything**, while it still runs the stock firmware:
+
+    PATH=$PWD/tools/bin:$PATH sinowisp read -d redragon-k630-norgb -s firmware --format ihex backup/k630-stock-firmware.hex
+    PATH=$PWD/tools/bin:$PATH sinowisp read -d redragon-k630-norgb -s full --format bin backup/k630-stock-full.bin
+
+Read it twice and compare: both reads must be identical. The MD5s below are those of the
+author's keyboard (read on 2026-11-14 with sinowisp 2.1.0). If yours differ, your board or
+firmware version is different from the one this project was built and tested on: stop and
+check `re/K630-HARDWARE.md` against your own dump before going further.
 
 | | |
 |---|---|
@@ -15,7 +25,7 @@ Read on 2026-11-14 with sinowisp 2.1.0 (`-d redragon-k630-norgb`) over the stock
 | File | Contents | MD5 |
 |---|---|---|
 | `k630-stock-full.bin` | full 64 KiB: firmware + bootloader (sinowisp file layout) | `bbc146cabd38bb0e97ab287eae95401c` |
-| `k630-stock-firmware.hex` | firmware section only (61440 bytes), Intel HEX: **use this to restore** | read MD5 `5be9da99f9f9228e814df3a2e9cbb287` |
+| `k630-stock-firmware.hex` | firmware section only (61440 bytes), Intel HEX: **use this to restore** | MD5 of the 61440 bytes it holds: `5be9da99f9f9228e814df3a2e9cbb287` |
 
 Two separate full reads were byte-identical, and the firmware-only read matches the
 first 61440 bytes of the full read.
@@ -26,7 +36,7 @@ app vector is kept near `0xeffb`. sinowisp converts between the two on read and 
 
 ## Restore stock firmware (stock bootloader untouched)
 
-    sinowisp write -d redragon-k630-norgb backup/k630-stock-firmware.hex
+    PATH=$PWD/tools/bin:$PATH sinowisp write -d redragon-k630-norgb -f backup/k630-stock-firmware.hex
 
 This only works if the keyboard can still get into ISP mode: either the running firmware
 honours the ISP-jump command, or there is no valid firmware. Otherwise use ICP

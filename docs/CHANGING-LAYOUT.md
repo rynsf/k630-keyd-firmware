@@ -49,7 +49,9 @@ tools/flash.sh build/smk/redragon-k630_default_smk.hex <the sha256 printed above
 ```
 
 `tools/flash.sh` refuses unless the computer is on mains power, the image matches that hash, the
-image contains no flash-write code, and the keyboard is present. It then writes with
+image contains no flash-write code, and the connected device is this K630: running this
+firmware, or running the stock firmware 12.10 *with* a matching backup in `backup/`
+(`tools/flash.sh --identify` shows what it sees). It then writes with
 `sinowisp` and verifies. On battery (at least 50%), prefix it with `K630_ALLOW_BATTERY=1`.
 The keyboard reconnects as "SMK Keyboard" a few seconds later.
 
@@ -65,11 +67,12 @@ cp build/smk/redragon-k630_default_smk.hex firmware/known-good.hex
 - **The keyboard comes back as `0603:1020` ("Gaming KB", update mode):** not bricked. Unplug
   it, wait 3 s, plug it back in without touching any keys. If it stays in update mode, flash
   the last good image, `firmware/known-good.hex` (`sha256sum` it and use `tools/flash.sh` as
-  above; it works from update mode too).
+  above, with `K630_ISP_MODE_OK=1` in front: in update mode the script cannot tell the K630
+  from other SinoWealth boards, so it asks you to confirm).
 - **The new layout misbehaves:** flash `firmware/known-good.hex` the same way.
 - **The keyboard does not respond at all:** hold **FN1** while plugging it in. That starts
   the bootloader (update mode), so you can flash `firmware/known-good.hex`.
-- **Back to the factory firmware:**
+- **Back to the factory firmware:** flash your own backup (see `backup/README.md`):
   `PATH=$PWD/tools/bin:$PATH sinowisp write -d redragon-k630-norgb -f backup/k630-stock-firmware.hex`
   (it types plain QWERTY again; its update command works too, so our firmware can go back on).
 

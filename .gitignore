@@ -7,3 +7,9 @@ re/out/
 __pycache__/
 firmware/redragon-k630/kd_config_gen.c*
 tests/failures/
+
+# Vendor material: not ours to redistribute. Kept locally only.
+backup/*.hex
+backup/*.bin
+docs/manual/
+docs/images/
