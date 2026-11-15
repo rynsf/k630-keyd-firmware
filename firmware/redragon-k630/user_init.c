@@ -3,7 +3,7 @@
 #include "gpio.h"
 #include "pwm.h"
 
-#define PWM_PERD        0x0DFC // LED PWM period, as the stock firmware
+#define PWM_PERD        300 // LED PWM period: 8 periods per LED subframe (backlight.c)
 #define PWM_PERDH_INIT  ((uint8_t)(PWM_PERD >> 8))
 #define PWM_PERDL_INIT  ((uint8_t)(PWM_PERD))
 
@@ -49,6 +49,7 @@ void user_gpio_init(void)
 }
 
 static void user_pwm_init(void) // as the stock firmware (0x1792...): duty1 = duty2 = 0, dark
+                                // (stock period 0x0DFC; ours is shorter, see PWM_PERD)
 {
     PWM0PERDH = PWM_PERDH_INIT;
     PWM0PERDL = PWM_PERDL_INIT;

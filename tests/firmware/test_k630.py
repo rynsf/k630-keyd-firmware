@@ -223,7 +223,7 @@ def col0_duty_xram():
     return lo, hi
 
 
-LED_DUTY = lambda level: 700 * level  # stock scale: duty2 = level * 50 * 14, 0 = dark
+LED_DUTY = lambda level: [0, 15, 38, 80, 150, 290][level]  # backlight.c led_duty[], 0 = dark
 FULL = 5
 
 
@@ -314,6 +314,44 @@ class TestBacklight(K630Case):
             a = int(m.group(2), 16)
             v = s.get_xram(a, 1)[0] if m.group(1) else s.get_sfr(a)
             self.assertEqual(v & 0x8A, 0x8A, "PWM%sCON" % ch)
+
+    def test_led_rows_off_and_pwm_running_during_the_scan(self):
+        """During every matrix scan all LED rows are off (else the last row is lit at full
+        power by the high column pins: Caps Lock alone lit the whole board), and the PWM
+        counters keep running (MODE_ENABLE set) with the pins released (SS clear), as the
+        stock firmware's scan phase (0x82)."""
+        s = self.s
+        s.cmd("set mem xram 0x%x 0x02" % s._a("keyboard_state"))   # Caps Lock on, backlight on
+        h = (ROOT / "third_party/smk/src/sino51lib/sh68f90/sh68f90.h").read_text()
+        rr = s._a("user_matrix_read_rows")
+        s.scan_isr(True)
+        s.loop(5)
+        s.brk(rr)
+        for _ in range(30):
+            s.run()
+            self.assertEqual(s.get_sfr(0xC0) & 0x3F, 0x3F, "all LED rows off during the scan")
+            for ch in "00 01 02 03 04 05 10 11 12 13 14 15 20 21 22 23 24 25 40 41 42".split():
+                m = re.search(r"SFR(X?)\(PWM%sCON,\s*(0x[0-9a-fA-F]+)\)" % ch, h)
+                a = int(m.group(2), 16)
+                v = s.get_xram(a, 1)[0] if m.group(1) else s.get_sfr(a)
+                self.assertEqual(v & 0x8A, 0x82, "PWM%sCON: counter running, pin released" % ch)
+        s.cmd("delete")
+        s.scan_isr(False)
+
+    def test_pwm_period_fits_the_led_subframe(self):
+        """8 PWM periods (CLK/4) per LED subframe (801 Timer2 counts at sysclk/12), so each
+        subframe shows whole periods whatever the free-running counter's phase."""
+        s = self.s
+        h = (ROOT / "third_party/smk/src/sino51lib/sh68f90/sh68f90.h").read_text()
+        for g in "0124":
+            vals = []
+            for half in "LH":
+                m = re.search(r"SFR(X?)\(PWM%sPERD%s,\s*(0x[0-9a-fA-F]+)\)" % (g, half), h)
+                a = int(m.group(2), 16)
+                vals.append(s.get_xram(a, 1)[0] if m.group(1) else s.get_sfr(a))
+            period = vals[0] | vals[1] << 8
+            self.assertEqual(period, 300, "PWM%s period" % g)
+        self.assertLess(abs(8 * 300 * 4 - 801 * 12), 16, "whole periods per subframe")
 
     def test_side_caps_led_held_off(self):
         """P0.3 is the side Caps LED, active low (stock 0x55AF). Held high = off, even with

@@ -125,3 +125,11 @@ void user_matrix_scan_pre(void)
     GPIO_OUTPUT(2, KB_C_P2_MASK);
     GPIO_OUTPUT(3, KB_C_P3_MASK);
 }
+
+// LED rows (P6.0-P6.5, active low) off before every matrix scan. smk's default is a no-op:
+// the last LED row then stayed on through the scan with every column driven high, lit at
+// full power whatever its PWM duty.
+void user_matrix_sinks_off(void)
+{
+    GPIO_HIGH(6, (uint8_t)(_P6_0 | LED_R0_P6_1 | LED_R1_P6_2 | LED_R2_P6_3 | LED_R3_P6_4 | LED_R4_P6_5));
+}
