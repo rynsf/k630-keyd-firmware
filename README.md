@@ -10,6 +10,8 @@ keyboards) and contains a port of keyd v2.6.0's own key engine. Your config is c
 keyd's own parser, and every image is checked against keyd itself in a simulator before it
 can be flashed.
 
+> Unofficial project: not affiliated with or endorsed by Redragon or SinoWealth.
+
 > **Warning.** Flashing custom firmware is at your own risk and may void your warranty.
 > The project is designed to make bricking very unlikely and to leave several ways back
 > (see [Safety](#safety)), but it cannot rule it out, and it has been built and tested on
@@ -53,7 +55,7 @@ Linux only (developed on Arch). You need git, Python 3, a C compiler, Rust (for 
 and the packages `meson ninja boost bison flex`.
 
 ```sh
-git clone <this repo> && cd <this repo>
+git clone https://github.com/rynsf/k630-keyd-firmware.git && cd k630-keyd-firmware
 tools/setup.sh                 # builds SDCC 4.5.0, the patched simulator, sinowisp; applies firmware/smk.patch
 ```
 

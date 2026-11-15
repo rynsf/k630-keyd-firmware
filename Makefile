@@ -68,9 +68,10 @@ firmware: $(FW_GEN)
 
 # Simulator tests of the image above, then the image vs keyd itself (SIM_RANDOM scripts).
 SIM_RANDOM ?= 1000
+JOBS       ?= $(shell nproc 2>/dev/null || echo 4)
 test-firmware: firmware
 	cd tests/firmware && $(TOOLPATH) python3 -m unittest -v test_k630
-	$(TOOLPATH) python3 tests/firmware/sim_difftest.py --config $(CONFIG) --random $(SIM_RANDOM) --seed $(SEED) --pins 0 --jobs 12
+	$(TOOLPATH) python3 tests/firmware/sim_difftest.py --config $(CONFIG) --random $(SIM_RANDOM) --seed $(SEED) --pins 0 --jobs $(JOBS)
 
 # The canary for the first flash: the same image with the pass-through config, kept as its
 # own file (build/canary/). Tests run against it, then the normal image is rebuilt.
@@ -79,7 +80,7 @@ canary:
 	mkdir -p build/canary
 	rm -rf build/canary/* && cp -r $(FW_BUILD)/redragon-k630_default_smk.* $(FW_BUILD)/user.lib.p build/canary/
 	cd tests/firmware && K630_FIRMWARE=$(CURDIR)/build/canary/$(FW_NAME) K630_CONFIG=tests/configs/passthrough.conf $(TOOLPATH) python3 -m unittest test_k630
-	K630_FIRMWARE=$(CURDIR)/build/canary/$(FW_NAME) $(TOOLPATH) python3 tests/firmware/sim_difftest.py --config tests/configs/passthrough.conf --random 300 --seed 4 --pins 0 --jobs 12
+	K630_FIRMWARE=$(CURDIR)/build/canary/$(FW_NAME) $(TOOLPATH) python3 tests/firmware/sim_difftest.py --config tests/configs/passthrough.conf --random 300 --seed 4 --pins 0 --jobs $(JOBS)
 	$(MAKE) --no-print-directory firmware
 	@sha256sum build/canary/$(FW_NAME)
 
