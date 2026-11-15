@@ -87,6 +87,6 @@ void user_init()
 {
     user_gpio_init();
     user_pwm_init();
-
-    IEN1 |= _EPWM0;
+    // No PWM interrupt: smk's handler is empty and never clears the flag (PWM00CON bit 5),
+    // which with the 50 us period would re-enter it back to back.
 }

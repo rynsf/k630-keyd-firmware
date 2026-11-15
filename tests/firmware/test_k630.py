@@ -165,6 +165,24 @@ class TestUsbIdentity(unittest.TestCase):
         self.assertEqual(self.sim.stopped_at(out), Sim.ISP_BOOTLOADER)
         self.assertEqual((self.sim.acc(out), self.sim.reg_b(out)), (0x5A, 0xA5))
 
+    def test_isp_command_during_the_boot_window_clears_the_marker(self):
+        """The ISP command can arrive while the start is still BOOTING (main loop not yet
+        healthy). The marker must be cleared before the jump, or the freshly flashed
+        firmware's first start goes to ISP (seen on the real keyboard)."""
+        run = self.sim.run
+        self.sim.run = lambda cmds, timeout=30: run(cmds + ["dump xram 0x%x 0x%x" % (MARKER, MARKER + 3)], timeout)
+        out = self.sim.trigger_isp_jump()
+        self.assertEqual(self.sim.stopped_at(out), Sim.ISP_BOOTLOADER)
+        m = re.findall(r"^0x0*%x\s+((?:[0-9a-fA-F]{2}\s+){4})" % MARKER, out, re.M | re.I)
+        self.assertTrue(m, out[-400:])
+        self.assertEqual([int(b, 16) for b in m[-1].split()], [0, 0, 0, 0])
+
+    def test_pwm_interrupt_never_enabled(self):
+        """smk's PWM handler is empty and never clears the flag: with the PWM interrupt on,
+        it would re-enter back to back. IEN1.EPWM0 stays off."""
+        out = self.sim.run(self.sim._boot_to_post_init() + ["dump sfr 0xa9 0xa9"])
+        self.assertEqual(Sim.dump_in_section(out, "dump sfr", 0xA9) & 0x02, 0)
+
     def test_wrong_isp_confirm_does_not_jump(self):
         out = self.sim.trigger_isp_jump(confirm=(0, 0), run_task=False)
         self.assertEqual(self.sim.stopped_at(out), Sim.SLED_END)

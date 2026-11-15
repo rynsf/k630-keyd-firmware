@@ -178,13 +178,12 @@ bool indicators_update_step(keyboard_state_t *keyboard, uint8_t current_step)
 
 void indicators_post_update()
 {
-    PWM00CON &= ~(1 << 5);
     indicators_pwm_enable();
 }
 
 void indicators_pwm_enable()
 {
-    PWM00CON = (uint8_t)(PWM_CON_COL | PWM_INT_ENABLE); // stock 0xCA: also the PWM0 interrupt
+    PWM00CON = PWM_CON_COL; // (stock 0xCA also enables its PWM0 interrupt: not used here)
     PWM01CON = PWM_CON_COL;
     PWM02CON = PWM_CON_COL;
     PWM03CON = PWM_CON_COL;
@@ -212,7 +211,7 @@ void indicators_pwm_enable()
 
 void indicators_pwm_disable() // pins released, counters keep running (stock phase 0)
 {
-    PWM00CON = (uint8_t)(PWM_CON_IDLE | PWM_INT_ENABLE); // stock 0xC2
+    PWM00CON = PWM_CON_IDLE;
     PWM01CON = PWM_CON_IDLE;
     PWM02CON = PWM_CON_IDLE;
     PWM03CON = PWM_CON_IDLE;

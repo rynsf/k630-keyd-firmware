@@ -63,6 +63,15 @@ static void enter_isp(void)
     isp_jump();
 }
 
+// The ISP command (sinowisp) jumps to the bootloader from smk's usb_task. Clear the marker
+// first: a start still inside its BOOTING window would otherwise make the freshly flashed
+// firmware's first start go to ISP. (Seen on the real keyboard: a flash sent 35 s after a
+// replug came back in ISP mode.)
+void board_before_isp(void)
+{
+    marker_write(false);
+}
+
 // FN1 (c9 = P3.1) pulls row 4 (P5.4) low while held. Read before clocks, USB or anything
 // else is set up, so a firmware that dies later in init can still be escaped from.
 static bool fn1_held_at_power_up(void)
