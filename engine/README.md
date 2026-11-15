@@ -21,7 +21,8 @@ for holds, rolls, nested tap/hold keys, layout switching, one-shot timing and th
 guard.
 
 `tests/configs/coverage.conf` exercises the supported actions that `rynsf.conf` does not use.
-A mutation check (7 deliberate engine bugs) is caught by these tests.
+During development, 7 deliberately introduced engine bugs were all caught by these tests
+(a one-off check; the mutants are not kept in the repo).
 
 ## Footprint (SDCC 4.5.0, rynsf.conf)
 

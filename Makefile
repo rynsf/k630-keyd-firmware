@@ -5,6 +5,10 @@
 #   make test-config CONFIG=x.conf  difftest one config
 #   make firmware                   build the K630 image (build/smk/), flashes nothing
 #   make test-firmware              simulator tests of that image + image vs keyd
+#   make canary                     the pass-through image used for a first flash (build/canary/)
+#   make tools                      keyd-oracle, keyd-export, keyd-inspect (tools/bin/)
+#   make clean                      remove build/ and the tools
+#   (CONFIG=keymap/x.conf selects the keyd config; default keymap/rynsf.conf)
 
 KEYD    := third_party/keyd/src
 KEYD_C  := $(KEYD)/keyboard.c $(KEYD)/string.c $(KEYD)/macro.c $(KEYD)/config.c \

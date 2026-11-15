@@ -276,7 +276,7 @@ static void send_output(uint8_t code, uint8_t pressed)
 // Stock Fn layers (decoded from the stock firmware, cross-checked with the manual).
 // FN1: translates a fixed set of keys; any other non-modifier key sends nothing.
 // FN2: tap = Menu; while held, non-modifier keys send nothing (they are the lighting
-//      combos, Phase 4). Modifiers always pass through, as in the stock firmware.
+//      combos: FN2 + 0 / - / = for the backlight). Modifiers always pass through, as in the stock firmware.
 // FN1 + LWin toggles Win-lock (not saved), which then drops both GUI keys.
 // What a key was pressed as is remembered, so releasing Fn first cannot leave it stuck.
 // ---------------------------------------------------------------------------------------

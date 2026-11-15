@@ -113,7 +113,8 @@ that last-resort path has not been tested on this keyboard.
 
 [`docs/HOW-IT-WORKS.md`](docs/HOW-IT-WORKS.md) explains the hardware and the firmware in
 detail. [`re/K630-HARDWARE.md`](re/K630-HARDWARE.md) is the hardware map recovered from the
-stock firmware. [`docs/DESIGN.md`](docs/DESIGN.md) is the project log, including every flash.
+stock firmware. [`docs/DESIGN.md`](docs/DESIGN.md) records the safety rules, design decisions and what was
+verified on the real keyboard.
 
 ## Repository layout
 
@@ -139,4 +140,5 @@ stock firmware. [`docs/DESIGN.md`](docs/DESIGN.md) is the project log, including
 ## License
 
 GPL-2.0, the same as smk, on which the firmware is built (see `LICENSE`). `engine/` is a
-port of keyd and keeps keyd's MIT license (`engine/LICENSE.keyd`).
+port of keyd and keeps keyd's MIT license (`engine/LICENSE.keyd`), as does
+`keymap/layouts/colemak`, keyd's Colemak layout file.

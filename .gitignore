@@ -1,5 +1,4 @@
 third_party/
-target/
 build/
 tools/bin/
 tools/sdcc-*/

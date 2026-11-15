@@ -1,8 +1,7 @@
 // K630 backlight: one mode, every key at one brightness, on or off.
 //
-// LED circuit (from the stock firmware's driver, re/K630-HARDWARE.md): rows P6.1-P6.5
-// active low, one PWM channel per key column (the same 14 channels as the Z11). As in the
-// stock firmware: every column channel is under PWM (0x8A) during an LED phase, the column
+// LED circuit (from the stock firmware's driver, re/K630-HARDWARE.md): a 6 x 21 grid, rows
+// P6.0-P6.5 active low, one PWM channel per column (see below). As in the stock firmware: every column channel is under PWM (0x8A) during an LED phase, the column
 // pins are inputs without pull-up so the PWM drives them, duty1 0, duty2 = brightness
 // (higher = brighter, 0 = dark). The PWM counters are never stopped: for the matrix scan
 // only the pin output (SS) is switched off (stock phase 0 writes 0x82), and the LED rows
@@ -29,10 +28,10 @@
 #include "usb.h"
 #include "backlight.h"
 
-// The stock firmware drives a 6 x 21 LED grid (it is a generic full-size build): rows
-// P6.0-P6.5, columns = the 14 key-column channels + PWM20-23 + PWM40-42. Not every K630
-// LED sits at its key's matrix position (key 4's LED is on one of the extra lines: dark
-// with only the 14 x 5 key grid), so "all on" drives the whole stock grid, as stock does.
+// The stock firmware drives a 6 x 21 LED grid (a generic build for larger boards too): rows
+// P6.0-P6.5, columns = the 14 key-column channels + PWM20-23 + PWM40-42. The K630's LEDs
+// appear to sit on rows P6.1-P6.5 x the 14 key columns (re/K630-HARDWARE.md); "all on"
+// drives the whole stock grid anyway, exactly as stock does, so no LED can be missed.
 #define LED_ROWS 6 // P6.0 .. P6.5; key row r is LED row r + 1
 // duty2 per brightness level, out of the period 300 (user_init.c): roughly doubling,
 // so each step is visible (5%, 13%, 27%, 50%, 97%)

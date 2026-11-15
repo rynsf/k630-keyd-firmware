@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Differential test: firmware engine (build/kd-host) vs keyd v2.6.0 (tools/bin/keyd-oracle).
+"""Differential test: firmware engine (build/<config>/kd-host, built by make) vs keyd v2.6.0 (tools/bin/keyd-oracle).
 
 Runs every hand-written script in tests/scripts/*.keys, then N random but physically valid
 key sequences over the K630's keys, with timings clustered around the config's thresholds.
@@ -17,7 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ORACLE = ROOT / "tools/bin/keyd-oracle"
-HOST = Path(os.environ.get("KD_HOST", ROOT / "build/kd-host"))
+HOST = Path(os.environ.get("KD_HOST", ROOT / "build/rynsf/kd-host"))  # make sets KD_HOST
 
 # The 61 keys of the K630, by keyd name (Fn never reaches keyd: handled in firmware).
 K630_KEYS = (

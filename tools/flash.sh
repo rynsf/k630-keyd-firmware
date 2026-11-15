@@ -91,12 +91,27 @@ if [ "${1:-}" = "--identify" ]; then
     exit 0
 fi
 
+if [ $# -ne 2 ]; then
+    echo "usage: tools/flash.sh <image.hex> <expected sha256>"
+    echo "       tools/flash.sh --identify"
+    exit 2
+fi
 img="$1"; want="$2"
-if [ "$(cat /sys/class/power_supply/AC0/online 2>/dev/null || echo 0)" != 1 ]; then
-  # K630_ALLOW_BATTERY=1: flash on battery anyway, if it is at least 50%
-  bat="$(cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 0)"
-  [ "${K630_ALLOW_BATTERY:-0}" = 1 ] && [ "$bat" -ge 50 ] || { echo "refusing: not on mains power (battery ${bat}%)"; exit 1; }
-  echo "on battery (${bat}%), allowed by K630_ALLOW_BATTERY"
+
+# Power: fine on external power (any online "Mains" or "USB" supply), or with no battery at
+# all (a desktop).
+# On battery only with K630_ALLOW_BATTERY=1 and at least 50%.
+PSU="${K630_POWER_SYSFS:-/sys/class/power_supply}" # (override: tests only)
+mains=0 bat=""
+for p in "$PSU"/*; do
+    case "$(usb_attr "$p" type)" in
+        Mains | USB) [ "$(usb_attr "$p" online)" = 1 ] && mains=1 ;; # USB: USB-C chargers
+        Battery) [ -n "$bat" ] || bat="$(usb_attr "$p" capacity)" ;;
+    esac
+done
+if [ "$mains" != 1 ] && [ -n "$bat" ]; then
+    [ "${K630_ALLOW_BATTERY:-0}" = 1 ] && [ "${bat:-0}" -ge 50 ] || { echo "refusing: not on mains power (battery ${bat}%)"; exit 1; }
+    echo "on battery (${bat}%), allowed by K630_ALLOW_BATTERY"
 fi
 [ "$(sha256sum "$img" | cut -d' ' -f1)" = "$want" ] || { echo "refusing: image hash differs"; exit 1; }
 python3 "$ROOT/tests/firmware/check_no_flash_write.py" "$img"

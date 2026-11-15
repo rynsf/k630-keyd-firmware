@@ -52,12 +52,23 @@ read with pull-ups.
   bound that wait**, so a stuck PLL ends in the watchdog → ISP fallback instead of a hang.
 - The watchdog is in use: the stock firmware clears `RSTSTAT` (the watchdog kick) during init.
 
-## Backlight and indicators (not yet mapped in detail)
+## Backlight and indicators
 
-- Caps Lock LED: P0.3 (the same as the Z11).
-- LED rows on P6.0–5 (stock `P6CR=0x3F`), driven by `0x5F06` and multiplexed with the key
-  columns. PWM4 channels 0–2 are set from the PWM interrupt. The Z11 uses LED rows
-  P6.1–5 with per-column PWM, which is probably the same here.
+- Side Caps Lock LED: P0.3, active low (`0x55AF`: Caps on → `CLR P0.3`).
+- LED grid 6 × 21, driven from the PWM0 period interrupt (`0x5784`) in 7 phases: phase 0
+  is the key scan, phases 1–6 each light one LED row.
+  - Rows: P6.0–5 (stock `P6CR=0x3F`), active low, switched by `0x5F06`. Phase *k* lights
+    P6.(*k*−1).
+  - Columns: one PWM channel each. 0–1 → PWM24/25, 2–7 → PWM10–15, 8–13 → PWM00–05 (the
+    14 key-column pins), 14–17 → PWM23–20 (P1.0–3), 18–20 → PWM40–42 (P5.0–2). Channel
+    on = `0x8A` (`0xCA` for PWM00, with its interrupt); for the scan phase `0x82`, so the
+    counters keep running and only the pins are released.
+  - Period `0x0DFC`, duty1 0, duty2 = the per-LED brightness byte × 14 (table at XRAM
+    `0x0A4F`, 126 bytes = 6 × 21). Before an LED phase all 21 column pins become inputs
+    without pull-up so the PWM drives them.
+  - Inferred: a table of LED indexes at ROM `0x55BA` (it looks like an animation path)
+    only covers rows P6.1–5 × columns 0–13, i.e. key row *r* at LED row P6.(*r*+1), same
+    column as the key. The firmware here drives the whole grid anyway.
 - Other outputs set at init, purpose unknown: P0.2, P0.4, P4.4, P5.5, P5.6, P7.5.
 
 ## USB
